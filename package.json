@@ -1,0 +1,12 @@
+{
+  "name": "jsql",
+  "version": "0.1.0",
+  "description": "Node and IBM SQL utility",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "nodemon .",
+    "test": "node test/index.js"
+  },
+  "author": "Shayne Trosdahl<shayne@trozdol.com>",
+  "license": "ISC"
+}
