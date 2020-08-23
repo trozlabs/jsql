@@ -2,11 +2,15 @@ const { PLACEHOLDER, OPERATOR } = require('./constants');
 const Clause = require('./Clause');
 const Column = require('./Column');
 
-console.log(Clause);
+// console.log(Clause);
 
 class Where extends Clause {
-    
-    statement = '';
+    // format the sql output for easier viewing or debugging. Should work find without disabling.
+    format = true;
+    //TODO: add subquery row number work around as an option for certain versions of DB2 
+    enablePaging = true; 
+
+    clause = '';
     params = [];
     
     currentColumn = null;
@@ -14,6 +18,12 @@ class Where extends Clause {
     
     #limit = 10;
     #offset = 0;
+
+    constructor({ format, enabledPaging }) {
+        super();
+        this.format = format;
+        this.enablePaging = enabledPaging;
+    }
 
     column(name, opts = {}) {
         const options = (this.type(name) === 'Object') ? name : Object.assign({ name }, opts);        
@@ -24,7 +34,7 @@ class Where extends Clause {
 
     and() {
         // this.currentColumn.filters.push('AND');
-        console.log('AND is not fully supported');
+        // console.log('AND is not fully supported');
         return this;
     }
 
@@ -154,36 +164,42 @@ class Where extends Clause {
         const params  = [];
         const columns = [];
         
-        var RET = `\n`;
+        var RET = this.format ? `\n` : ' ';
         var ADD = ' AND ';
         
         this.columns.forEach(column => {
-            // console.log(column)
             const filters = []; 
+        
             column.filters.forEach(filter => {
                 // Skip if the value isn't passed in. Kinda the whole point of this.
                 if (this.type(filter.value) === 'Undefined') return;
                 if (this.type(filter.value) === 'Array' && filter.value.length) return;
+                
                 // Add to the params array to make sure we have the 
                 // param values in the correct order of each expression 
                 // and placeholder
                 params.push(filter.getParam());
+                
                 filters.push(filter.sql());
-                // filters.push(`${filter.column} ${filter.operator} ${filter.placeholder}`);
             });
 
             if (filters.length) {
                 columns.push(`( ${filters.join(ADD)} )`);
             }
         });
-
-        this.params     = params;
-        this.statement  = [
-            `WHERE `, 
+        
+        var clause = [
+            `${params.length > 0 ? 'WHERE' : ''} `,
             `    ${columns.join(`${RET}AND `)}`,
-            `LIMIT  ${this.#limit}`,
-            `OFFSET ${this.#offset}`
+            `LIMIT  ?`,
+            `OFFSET ?`
         ].join(RET);
+                
+        params.push({ LIMIT: this.#limit }, { OFFSET: this.#offset});
+
+        this.clause = clause;
+        this.params = params;
+
         return this;
     }
 
@@ -191,8 +207,9 @@ class Where extends Clause {
         return this.params;
     }
 
-    toString() {
-        return this.statement;
+    sql() {
+        if (!this.clause) this.build();
+        return this.clause;
     }
 }
 
