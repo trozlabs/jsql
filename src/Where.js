@@ -10,6 +10,8 @@ class Where extends Clause {
     //TODO: add subquery row number work around as an option for certain versions of DB2 
     enablePaging = true; 
 
+    #allowedColumns = [];
+
     clause = '';
     params = [];
     
@@ -19,14 +21,44 @@ class Where extends Clause {
     #limit = 10;
     #offset = 0;
 
-    constructor({ format, enabledPaging }) {
+    constructor(options = {}) {
         super();
-        this.format = format;
-        this.enablePaging = enabledPaging;
+        this.format = options.format;
+        this.enablePaging = true;
+    }
+    
+    isAllowed(name) {
+        // if (this.#allowedColumns.length === 0) return true;
+        // console.log('is ' + name + ' allowed ', this.#allowedColumns.includes(name));
+        // return this.#allowedColumns.includes(name);
+        return true;
+    }
+
+    setAllowed(...names) {
+        this.#allowedColumns.push(...names);
+        console.log(this.#allowedColumns)
+        return this;
+    }
+
+    where({ name, operator, placeholder, value, sql }) {
+        const column = this.columns.get(name);
+        if (!this.isAllowed(name)) {
+            console.error(`${name} is not allowed.`);
+            return this;
+        }
+        column.add({ 
+            column: name,
+            operator: OPERATOR[operator],
+            placeholder: PLACEHOLDER[placeholder],
+            value: value
+        });
     }
 
     column(name, opts = {}) {
         const options = (this.type(name) === 'Object') ? name : Object.assign({ name }, opts);        
+        if (!this.isAllowed(options.name)) {
+            throw new Error(`The column name '${name}' is not allowed. Allowed Columns are:`, this.#allowedColumns);
+        }
         this.currentColumn = this.columns.has(options.name) ? this.columns.get(options.name) : new Column(options);
         this.columns.set(name, this.currentColumn);
         return this;
@@ -144,6 +176,16 @@ class Where extends Clause {
         return this;
     }
 
+    group() {
+        console.warn('TODO: group by')
+        return this;
+    }
+
+    sort(...values) {
+        console.warn('TODO: order by')
+        return this;
+    }
+
     limit(value = 25) {
         this.#limit = value;
         return this;
@@ -163,13 +205,14 @@ class Where extends Clause {
     build() {
         const params  = [];
         const columns = [];
-        
+        const values  = {};
+
         var RET = this.format ? `\n` : ' ';
         var ADD = ' AND ';
         
         this.columns.forEach(column => {
-            const filters = []; 
-        
+            const filters = [];
+
             column.filters.forEach(filter => {
                 // Skip if the value isn't passed in. Kinda the whole point of this.
                 if (this.type(filter.value) === 'Undefined') return;
@@ -178,8 +221,9 @@ class Where extends Clause {
                 // Add to the params array to make sure we have the 
                 // param values in the correct order of each expression 
                 // and placeholder
-                params.push(filter.getParam());
-                
+                const param = filter.getParam();
+                values[param.name] = param.value;
+                params.push(param);
                 filters.push(filter.sql());
             });
 
@@ -194,17 +238,30 @@ class Where extends Clause {
             `LIMIT  ?`,
             `OFFSET ?`
         ].join(RET);
-                
-        params.push({ LIMIT: this.#limit }, { OFFSET: this.#offset});
+
+        params.push({ 
+            name: 'LIMIT',
+            LIMIT: this.#limit
+        }, { 
+            name: 'OFFSET',
+            OFFSET: this.#offset
+        });
+        values.LIMIT = this.#limit;
+        values.OFFSET = this.#offset;
 
         this.clause = clause;
         this.params = params;
+        this.values = values;
 
         return this;
     }
 
     getParams() {
         return this.params;
+    }
+
+    getValues() {
+        return this.values;
     }
 
     sql() {

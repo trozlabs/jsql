@@ -5,9 +5,16 @@ class Filter extends Clause {
     operator = '=';
     placeholder = '?';
     value = null;
+    type = 'string'
 
     getParam() {
-        return { [this.column]: this.value };
+        const type = this.type;
+        return {
+            type,
+            name: this.column,
+            value: this.value,
+            [this.column]: this.value
+        };
     }
 
     sql() {

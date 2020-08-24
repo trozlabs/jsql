@@ -10,7 +10,7 @@ const { Where } = require('../src/index');
 //     .column('TEST_MISSING_VAL').between()
 //     .column('TEST_MISSING_VAL').lte()
 //     .page(3)
-    // .build()
+// .build()
 
 where = new Where({ format: true })
     .column('ID')
