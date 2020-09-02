@@ -11,144 +11,154 @@ SQL Helper Utility to handle IBM related syntax differences.
 - Pagination.
 
 
-### Example:
+## Example:
 
-```javascript
-
-const { Where } = require('jsql');
-
-const where = new Where({ format: true })
-    .column('ID')
-        .is(100)
-    .column('NAME')
-        .is('Thing').is('Mars')
-    .column('DESC')
-        .is('Product Desc').and().not('')
-    .column('CREATED_AT')
-        .gte('1993-01-01')
-    .column('UPDATED_AT')
-        .lte('2019-11-10')
-    .column('TEST_MISSING_VAL')
-        .is().and().not('not-this-value')
-    .column('TEST_MISSING_VAL')
-        .between()
-    .column('TEST_MISSING_VAL')
-        .lte()
-    .page(3) // .page(page, limit)
-    .build() // .sql() will run the build if it has not been built yet and return the SQL string. 
-    
-
-// for now it's byo-select
-const sql = `
-    SELECT *
-    FROM SOME_TABLE 
-    ${where.sql()}`;
-
-console.log(`
--------------------------------------
-
-SELECT 
-    ID,
-    NAME,
-    DESC
-FROM 
-    TABLE_1 
-${where.sql()}
-
--------------------------------------
-params: ${JSON.stringify(where.params)}
-
-`);
-
-```
-
-
-Output: 
-
-```log
-
-SELECT 
-    ID,
-    NAME,
-    DESC
-FROM 
-    TABLE_1 
-WHERE 
-    ( ID = ? )
-AND ( NAME = ? AND NAME = ? )
-AND ( DESC = ? AND DESC <> ? )
-AND ( CREATED_AT >= ? )
-AND ( UPDATED_AT <= ? )
-AND ( TEST_MISSING_VAL <> ? )
-LIMIT  ?
-OFFSET ?
-
--------------------------------------
-
-params: [
-    { "ID": 100 },
-    { "NAME": "Thing" },
-    { "NAME": "Mars" },
-    { "DESC": "Product Desc" },
-    { "DESC": "" },
-    { "CREATED_AT": "1993-01-01" },
-    { "UPDATED_AT": "2019-11-10" },
-    { "TEST_MISSING_VAL": "not-this-value" },
-    { "LIMIT": 25 },
-    { "OFFSET": 75 }
-]
-
-```
+### Select
 
 ```js
+const { SQL, IBM, MySQL } = require('jsql');
+const { format } = require('mysql');
+var stmt;
+var query = {
+    id: 123,
+    a: 'a val',
+    b: 'b val',
+    c: undefined,
+    d: 'd val',
+    page: 1,
+    limit: 25
+}
 
-where = new Where({ format: true })
-    .column('ID').is()
-    .column('NAME').between()
-    .column('DESC').like()
+stmt = new SQL.Builder()
+    .select('DISTINCT')
+        .raw('(select id from some_table ) as ID')
+        .column('A', 'A1')
+        .column('B', 'B1')
+        .column('C', 'C1')
+        .column('D', 'D1')
+    .from()
+        .table('TABLE_ONE', 'T1')
+    .join()
+        .table('TABLE_JOIN', 'ID','TABLE_ONE', 'ID')
+    .right()
+        .table('TABLE_RIGHT', 'ID', '>', 'TABLE_ONE', 'ID')
+    .left()
+        .table('TABLE_LEFT', 'ID', '=', 'TABLE_ONE', 'ID')
+    .where()
+        .column('ID', '=', 123)
+        .column('A', '=', query.a)
+        .column('B', '=', query.b)
+        .column('C', '=', query.c)
+        .column('D', '=', query.d)
+    .group()
+        .column('A')
+        .column('B')
+    .order()
+        .column('C', 'DESC')
+        .column('D', 'DESC')
+    .page(1, 10)
 
-console.log(`
--------------------------------------
-
-SELECT 
-    ID,
-    NAME,
-    DESC
-FROM 
-    TABLE_1 
-${where.sql()}
-
--------------------------------------
-params: ${JSON.stringify(where.params)}
-
-`);
-
+console.log(stmt.sql());
+console.log(stmt.params(SQL.Builder.IBMMODEL));
+console.log(stmt.params(SQL.Builder.IBMPARAMS));
 ```
 
-Output when all params were not given a value.
+    SELECT     	 DISTINCT, (select id from some_table ) as ID, A AS A1, B AS B1, C AS C1, D AS D1
+    FROM       	 TABLE_ONE AS T1
+    JOIN    	 TABLE_JOIN ON TABLE_JOIN.ID = TABLE_ONE.ID 
+    RIGHT JOIN    	 TABLE_RIGHT ON TABLE_RIGHT.ID > TABLE_ONE.ID 
+    LEFT JOIN    	 TABLE_LEFT ON TABLE_LEFT.ID = TABLE_ONE.ID
+    WHERE   	 ID = ? AND A = ? AND B = ? AND D = ?
+    GROUP BY	 A, B
+    ORDER BY	 C DESC, D DESC
+    LIMIT   	 ?
+    OFFSET  	 ?
 
+    [
+        { name: '0' },
+        { name: '1' },
+        { name: '2' },
+        { name: '3' },
+        { name: '4' },
+        { name: '5' }
+    ]
+    { '0': 123, '1': 'a val', '2': 'b val', '3': 'd val', '4': 10, '5': 0 }
+
+### Update
+
+```js
+stmt = new SQL.Builder()
+    .update()
+        .table('TABLE_ONE')
+        .set()
+            .column('A', query.a)
+            .column('B', query.b)
+            .column('C', query.c)
+            .column('D', query.d)
+    .where()
+        .column('ID', '=', query.id)
+    .limit(1)
+
+console.log(stmt.sql())
+console.log(stmt.params());
 ```
-SELECT 
-    ID,
-    NAME,
-    DESC
-FROM 
-    TABLE_1 
- 
+
+    UPDATE     	 TABLE_ONE
+    SET        	 A = ?,	B = ?,	D = ?
+    WHERE   	 ID = ?
+    LIMIT   	 ?
+
+
+    [
+        { id: 'set-A-1', name: 'A', index: 0, values: 'a val' },
+        { id: 'set-B-2', name: 'B', index: 1, values: 'b val' },
+        { id: 'set-D-4', name: 'D', index: 2, values: 'd val' },
+        { id: 'where-ID-5', name: 'ID', index: 3, values: 123 },
+        { id: 'limit-LIMIT-6', name: 'LIMIT', index: 4, values: 1 }
+    ]
+
+### Insert
+
+```js
+stmt = new SQL.Builder()
+    .insert()
+        .table('TABLE_ONE')
+    .values()
+        .column('A', query.a)
+        .column('B', query.b)
+        .column('C', query.c)
+        .column('D', query.d)
+
+console.log(stmt.sql());
+console.log(stmt.params());
+```
+
+    INSERT INTO	 TABLE_ONE
+                ( A, B, D ) VALUES ( ?, ?, ? )
+    [
+        { id: 'values-A-1', name: 'A', index: 0, values: 'a val' },
+        { id: 'values-B-2', name: 'B', index: 1, values: 'b val' },
+        { id: 'values-D-4', name: 'D', index: 2, values: 'd val' }
+    ]
+
+
+### Delete
+
+```js
+stmt = new SQL.Builder()
+    .delete()
+        .table('TABLE_ONE')
+    .where()
+        .column('ID', '=', 1234)
+
+console.log(stmt.sql())
+console.log(stmt.params(
+```
+
+    DELETE FROM	 TABLE_ONE
+    WHERE   	 ID = ?
     
-LIMIT  ?
-OFFSET ?
+    [ 
+        { id: 'where-ID-1', name: 'ID', index: 0, values: 1234 } 
+    ]
 
--------------------------------------
-
-params: [
-    { "LIMIT":10 },
-    { "OFFSET":0 }
-]
-```
-
-
-## TODO:
-
-- add subquery row number work around as an option for certain versions of DB2 
-- full query generation with joins 

@@ -1,10 +1,10 @@
 {
   "name": "jsql",
-  "version": "0.1.0",
-  "description": "Node and IBM SQL utility",
+  "version": "0.1.1",
+  "description": "Node, MySQL and IBM SQL generator",
   "main": "src/index.js",
   "scripts": {
-    "start": "nodemon .",
+    "start": "nodemon test/index.js",
     "test": "node test/index.js"
   },
   "author": "Shayne Trosdahl<shayne@trozdol.com>",

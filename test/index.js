@@ -16,22 +16,6 @@ var query = {
 console.log('\n=========================================================================\n');
 
 stmt = new SQL.Builder()
-    .update()
-        .table('TABLE_ONE')
-        .set()
-            .column('A', query.a)
-            .column('B', query.b)
-            .column('C', query.c)
-            .column('D', query.d)
-    .where()
-        .column('ID', '=', query.id)
-    .limit(1)
-
-console.log(stmt.sql())
-console.log(stmt.params());
-console.log('\n=========================================================================\n');
-
-stmt = new SQL.Builder()
     .select('DISTINCT')
         .raw('(select id from some_table ) as ID')
         .column('A', 'A1')
@@ -66,6 +50,21 @@ console.log(stmt.params(SQL.Builder.IBMMODEL));
 console.log(stmt.params(SQL.Builder.IBMPARAMS));
 console.log('\n=========================================================================\n');
 
+stmt = new SQL.Builder()
+    .update()
+        .table('TABLE_ONE')
+        .set()
+            .column('A', query.a)
+            .column('B', query.b)
+            .column('C', query.c)
+            .column('D', query.d)
+    .where()
+        .column('ID', '=', query.id)
+    .limit(1)
+
+console.log(stmt.sql())
+console.log(stmt.params());
+console.log('\n=========================================================================\n');
 stmt = new SQL.Builder()
     .insert()
         .table('TABLE_ONE')
