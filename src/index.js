@@ -1,7 +1,6 @@
 const constants = require('./constants');
-const Clause = require('./Clause');
-const Where = require('./Where');
-const Column = require('./Column');
-const Filter = require('./Filter');
+const SQL = require('./sql');
+const MySQL = require('./MySQL');
+const IBM = require('./IBM');
 
-module.exports = { Clause, Column, Filter, Where, constants };
+module.exports = { constants, SQL, MySQL, IBM };
