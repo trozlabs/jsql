@@ -26,7 +26,7 @@ class Builder {
         COLUMN: 'column',
     };
     #delimeter = {
-        select           : ', ' ,
+        select           : ',\n\t' ,
         insert           : '\t' ,
         update           : '\t' ,
         delete           : ''      ,
@@ -44,11 +44,11 @@ class Builder {
         where            : ' AND ',
         group_by         : ', ',
         order_by         : ', ',
-        limit            : '',
-        offset           : '',
+        limit            : ' ',
+        offset           : ' ',
     };
     #clause = {
-        select           : 'SELECT     \t',
+        select           : 'SELECT     \n\t',
         insert           : 'INSERT INTO\t',
         into             : 'INSERT INTO\t',
         values           : '           \t',
@@ -63,7 +63,7 @@ class Builder {
         left_join        : '',
         left_outer_join  : '',
         left_inner_join  : '',
-        where            : 'WHERE   \t',
+        where            : 'WHERE   \n\t',
         group_by         : 'GROUP BY\t',
         order_by         : 'ORDER BY\t',
         limit            : 'LIMIT   \t',
@@ -478,7 +478,9 @@ class Builder {
             case 'values':
             case 'limit':
             case 'offset':
+            case 'order_by':
                 return true;
+            case 'order_by':
             case 'select':
             case 'update':
             case 'insert':

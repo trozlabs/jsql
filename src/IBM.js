@@ -3,6 +3,7 @@ const { EventEmitter } = require('events');
 class IBM extends EventEmitter {
     
     static defaults = {
+        eradaniConnect: {},
         machineName: '*LOCAL',
         username: 'TEST', 
         password: 'eradani', 
@@ -47,7 +48,7 @@ class IBM extends EventEmitter {
 
     #log = function() {
         const args = Array.from(arguments);
-        if (this.logging) console.log('DATABASE:', this.database, ...args);
+        if (this.logging) console.log('JSQL: IBM:', this.database, ...args);
         return args;
     }
 
@@ -72,6 +73,7 @@ class IBM extends EventEmitter {
             }
             return results;
         } catch (e) {
+            this.#log(e, sql, model, params);
             throw e;
         }
     }

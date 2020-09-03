@@ -84,7 +84,7 @@ class Fragment {
         var operator = (this.operator || '');
         switch (operator.toUpperCase()) {
             case 'LIKE':
-                return `'%' || ? || '%'`;
+                return `CONCAT('%' || ? || '%')`;
             case 'STARTWITH':
                 return `CONCAT(?, '%')`;
             case 'STARTWITH':
