@@ -1,6 +1,11 @@
 const { PLACEHOLDER, OPERATOR } = require('../constants');
 const Fragment = require('./Fragment');
 
+const EOL = '\n';
+const TAB = '\t';
+const SPACE = ' ';
+const COMMA = ',';
+
 class Builder {
     static PLACEHOLDER = PLACEHOLDER;
     static OPERATOR    = OPERATOR;
@@ -26,36 +31,36 @@ class Builder {
         COLUMN: 'column',
     };
     #delimeter = {
-        select           : ',\n\t' ,
-        insert           : '\t' ,
-        update           : '\t' ,
-        delete           : ''      ,
-        set              : ',\t' ,
-        into             : ' ' ,
-        values           : ', ' ,
-        from             : ',\n',
-        join             : ' \n',
-        right_join       : ' \n',
-        right_outer_join : ' \n',
-        right_inner_join : ' \n',
-        left_join        : ' \n',
-        left_outer_join  : ' \n',
-        left_inner_join  : ' \n',
-        where            : ' AND ',
-        group_by         : ', ',
-        order_by         : ', ',
-        limit            : ' ',
-        offset           : ' ',
+        select           : COMMA + SPACE,
+        insert           : '' ,
+        update           : '' ,
+        delete           : '',
+        set              : COMMA,
+        into             : SPACE,
+        values           : COMMA + SPACE,
+        from             : COMMA + SPACE,
+        join             : SPACE,
+        right_join       : SPACE,
+        right_outer_join : SPACE,
+        right_inner_join : SPACE,
+        left_join        : SPACE,
+        left_outer_join  : SPACE,
+        left_inner_join  : SPACE,
+        where            : SPACE + 'AND' + SPACE,
+        group_by         : COMMA + SPACE,
+        order_by         : COMMA + SPACE,
+        limit            : SPACE,
+        offset           : SPACE,
     };
     #clause = {
-        select           : 'SELECT     \n\t',
-        insert           : 'INSERT INTO\t',
-        into             : 'INSERT INTO\t',
-        values           : '           \t',
-        update           : 'UPDATE     \t',
-        set              : 'SET        \t',
-        delete           : 'DELETE FROM\t',
-        from             : 'FROM       \t',
+        select           : 'SELECT',
+        insert           : 'INSERT INTO',
+        into             : 'INSERT INTO',
+        values           : '',
+        update           : 'UPDATE',
+        set              : 'SET',
+        delete           : 'DELETE FROM',
+        from             : 'FROM',
         join             : '',
         right_join       : '',
         right_outer_join : '',
@@ -63,11 +68,11 @@ class Builder {
         left_join        : '',
         left_outer_join  : '',
         left_inner_join  : '',
-        where            : 'WHERE   \n\t',
-        group_by         : 'GROUP BY\t',
-        order_by         : 'ORDER BY\t',
-        limit            : 'LIMIT   \t',
-        offset           : 'OFFSET  \t',
+        where            : 'WHERE',
+        group_by         : 'GROUP BY',
+        order_by         : 'ORDER BY',
+        limit            : 'LIMIT',
+        offset           : 'OFFSET',
     };
     #steps = {
         none  : ['update','set','values','select','from','join','where','group_by','order_by','limit','offset'],
@@ -605,9 +610,25 @@ class Builder {
         return this.#params;
     }
     
-    sql() {
+    sql(format) {
+        
         if (!this.#statement.length) this.build();
-        return this.#statement.join('\n');
+        var statement = this.#statement.join(SPACE);
+        const TAB_SPACE = SPACE + SPACE + SPACE + SPACE;
+        if (format) {
+            statement = statement.replace('SELECT ',        EOL + 'SELECT' + EOL + TAB_SPACE);
+            statement = statement.replace(', ',             ', ' +  EOL + TAB_SPACE);
+            statement = statement.replace(' FROM ',         EOL + 'FROM ');
+            statement = statement.replace('  JOIN ',        EOL + 'JOIN ');
+            statement = statement.replace('LEFT JOIN',      EOL + 'LEFT JOIN');
+            statement = statement.replace('RIGHT JOIN',     EOL + 'RIGHT JOIN');
+            statement = statement.replace(' ON ',           EOL + TAB_SPACE + 'ON ');
+            statement = statement.replace(' WHERE ',        EOL + 'WHERE ' + EOL + TAB_SPACE);
+            statement = statement.replace(' AND ',          EOL + TAB_SPACE + 'AND ');
+            statement = statement.replace(' LIMIT ',        EOL + 'LIMIT ');
+            statement = statement.replace(' OFFSET ',       EOL + 'OFFSET ');
+        }
+        return statement;
     }
 }
 

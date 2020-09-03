@@ -140,7 +140,7 @@ class Fragment {
             case 'right_outer_join':
                 direction = (direction == 'JOIN' ? '' : direction + ' ');
                 placeholder = placeholder || (ontable + '.' + oncolumn);
-                return `\b${direction}JOIN    \t ${table} ON ${table}.${column} ${operator} ${ontable + '.' + oncolumn}`;
+                return `${direction}JOIN ${table} ON ${table}.${column} ${operator} ${ontable + '.' + oncolumn}`;
             case 'group_by': 
                 return `${schema}`;
             case 'order_by': 
