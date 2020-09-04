@@ -64,7 +64,7 @@ class IBM extends EventEmitter {
                 return this.#cache.get('results', results);
             }
             const { eradaniConnect, machineName, username, password, options } = this.#config;
-            const transport = new eradaniConnect.transports.Xml(machineName, username, password, options);
+            const transport = new eradaniConnect.transports.Odbc(machineName, username, password, options);
             const request = new eradaniConnect.run.Sql(sql, { params: model });
             const results = await transport.execute(request, params);
             
