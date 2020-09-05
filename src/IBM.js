@@ -3,13 +3,14 @@ const { EventEmitter } = require('events');
 class IBM extends EventEmitter {
     
     static defaults = {
+        connection: null,
         eradaniConnect: {},
         machineName: '*LOCAL',
         username: 'TEST', 
         password: 'eradani', 
         options: {
             host: 'localhost',
-            port: 57700, 
+            port: 57700,
             path: '/cgi-bin/xmlcgi.pgm', 
             debug: true,
             usePOST: true
@@ -34,12 +35,12 @@ class IBM extends EventEmitter {
 
         // this.#log(config);
         
-        try {
-            if (!config.eradaniConnect) config.eradaniConnect = require('@eradani-inc/eradani-connect');
-        } catch (e){
-            console.error('mysql required. `npm i eradani-connect`', e);
-            throw e;
-        }
+        // try {
+        //     if (!config.eradaniConnect) config.eradaniConnect = require('@eradani-inc/eradani-connect');
+        // } catch (e){
+        //     console.error('mysql required. `npm i eradani-connect`', e);
+        //     throw e;
+        // }
 
         this.#config = config;
         this.#self = this.constructor;
@@ -63,11 +64,10 @@ class IBM extends EventEmitter {
             if (useCache && this.#cache.has('results')) {
                 return this.#cache.get('results', results);
             }
-            const { eradaniConnect, machineName, username, password, options } = this.#config;
-            const transport = new eradaniConnect.transports.Odbc(machineName, username, password, options);
+            const { eradaniConnect, machineName, username, password, options, odbc } = this.#config;
+            const connection = new eradaniConnect.transports.Odbc(odbc, options);
             const request = new eradaniConnect.run.Sql(sql, { params: model });
-            const results = await transport.execute(request, params);
-            
+            const results = await connection.execute(request, params);
             if (useCache) {
                 this.#cache.set('results', results);
             }
