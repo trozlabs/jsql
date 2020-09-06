@@ -266,7 +266,7 @@ class Builder {
     column() {
         var options = this.options(arguments, this.#fragmentType.COLUMN);
         var clause = options.clause;
-
+        
         // SELECT
         if (clause === 'select') {
             
@@ -361,19 +361,28 @@ class Builder {
 
         // GROUP BY
         if (clause === 'group_by') {
-            
+            console.log(options);    
             if (arguments.length == 1) {
                 options.column = arguments[0];
             }
+            if (arguments.length == 2) {
+                options.table  = arguments[0];
+                options.column = arguments[1];
+            }
+            if (arguments.length == 3) {
+                options.database = arguments[0];
+                options.table    = arguments[1];
+                options.column   = arguments[2];
+            }
 
-            if (arguments.length > 1) {
+            if (arguments.length > 3) {
                 console.warn('too many arguments for group.column')
             }
         }
 
         // ORDER BY
         if (clause === 'order_by') {
-            
+            console.log(options);
             if (arguments.length == 1) {
                 options.column = arguments[0];
             }
@@ -383,7 +392,13 @@ class Builder {
                 options.direction = arguments[1];
             }
 
-            if (arguments.length > 2) {
+            if (arguments.length == 3) {
+                options.table     = arguments[0];
+                options.column    = arguments[1];
+                options.direction = arguments[2];
+            }
+
+            if (arguments.length > 3) {
                 console.warn('too many arguments for order.column')
             }
         }
@@ -483,9 +498,9 @@ class Builder {
             case 'values':
             case 'limit':
             case 'offset':
-            case 'order_by':
                 return true;
             case 'order_by':
+            case 'group_by':
             case 'select':
             case 'update':
             case 'insert':
@@ -503,11 +518,11 @@ class Builder {
         const parameters    = [];
         
         for (let step of steps) {
-        
+            
             const fragments = this.#fragments.filter(fragment => (fragment.clause.endsWith(step)));
             const statementClause = [];
             var sql;
-
+            console.log(step, fragments)
             /**
              * Special handling of insert statements due to ...( A, B, C ) VALUES ( ?, ?, ? )
              */            
@@ -561,6 +576,7 @@ class Builder {
                             });
                         });
                     }
+                    console.log(fragment.sql)
                     statementClause.push(fragment.sql);
                 });
 
