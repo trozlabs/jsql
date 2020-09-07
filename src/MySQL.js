@@ -5,9 +5,9 @@ const mysql = require('mysql');
 class MySQL extends EventEmitter {
     
     static defaults = {
-        host: 'localhost',
+        hostname: 'localhost',
         port: 3306,
-        user: 'root',
+        username: 'root',
         password: 'root',
         database: '',
         connectionLimit : 10,
@@ -15,9 +15,9 @@ class MySQL extends EventEmitter {
 
     logging = true;
     
-    host;
     port;
-    user;
+    hostname;
+    username;
     password;
     database;
 
@@ -39,28 +39,27 @@ class MySQL extends EventEmitter {
         
         this.#self = this.constructor;
 
-        config = Object.assign({}, this.#self.defaults, config);
+        this.#config = Object.assign({}, config);
         
-        this.#log(config);
+        this.#log(this.#config);
         
         try {
             if (!mysql) mysql = require('mysql');
         } catch (e){
-            console.error('mysql required. `npm i --save mysql`', e);
+            console.error('mysql required. `npm i mysql`', e);
             throw e;
         }
-
-        this.#config = config;
+        
         this.#self = this.constructor;
         this.#cache = new Map();
         
-        this.host = config.host;
-        this.port = config.port;
-        this.user = config.user;
+        this.port     = config.port;
+        this.host = config.hostname;
+        this.user = config.username;
         this.password = config.password;
         this.database = config.database;
 
-        this.#pool = mysql.createPool(config);
+        this.#pool = mysql.createPool(this.#config);
         this.#connection = null;
     }
 
@@ -100,7 +99,7 @@ class MySQL extends EventEmitter {
     }
 
     async query(sql, params = []) {
-        // this.#log(`${this.constructor.name}.query()`, sql, params);
+        this.#log(`${this.constructor.name}.query()`, sql, params);
 
         const connection = await this.connect();
         

@@ -1,13 +1,16 @@
 class Fragment {
     index;
 
+    statementType;
     clause;      // select insert update delete where from group by order by
-    type; // column, table, 
-    
+    type;       // column, table,
+
     database;    // database_name
     table;       // table_name
     column;      // column_name
     direction;   // left right inner outer asc desc
+    
+    ondatabase;
     ontable;     // table to join on
     oncolumn;    // column to join on
 
@@ -19,14 +22,13 @@ class Fragment {
     #values;      // 1 or more or values
     #schema;
     #sql;
-    
 
     set id (string) {
         this.#id = string;
     }
     get id () {
         if (this.#id) return this.#id;
-        return `${this.clause}-${this.column || this.table}-${this.index || 0}`;
+        return (`${this.clause}-${this.column || this.table}-${this.index || 0}`).toUpperCase();
     }
 
     set name (string) {
@@ -42,13 +44,13 @@ class Fragment {
     }
     get alias () {
         var alias = this.#alias;
-        if (!alias) {
-            if (this.clause == 'from' || this.clause.endsWith('join')) {
-                alias = this.table;
-            } else if (this.clause == 'select') {
-                alias = this.column;
-            }
-        }
+        // if (!alias) {
+        //     if (this.clause == 'from' || this.clause.endsWith('join')) {
+        //         alias = this.table;
+        //     } else if (this.clause == 'select') {
+        //         alias = this.#alias;
+        //     }
+        // }
         return alias;
     }
 
@@ -57,7 +59,14 @@ class Fragment {
     }
     get schema () {
         if (this.#schema) return this.#schema;
-        return (this.table ? this.table + '.' : '') + this.column;
+
+        var database = (this.database ? this.database : '');
+        var table    = (this.table    ? this.table    : '');
+        var column   = (this.column   ? this.column   : '');
+        var parts    = [database, table, column];
+        var schema   = parts.filter(part => (part && part.length)).join('.');
+        // console.log(schema);
+        return schema;
     }
 
     set values (obj) {
@@ -82,6 +91,7 @@ class Fragment {
         if (this.#placeholder) return this.#placeholder;
 
         var operator = (this.operator || '');
+        
         switch (operator.toUpperCase()) {
             case 'LIKE':
                 return `CONCAT('%' || ? || '%')`;
@@ -109,56 +119,107 @@ class Fragment {
         this.#sql = string;
     }
     get sql () {
-        if (this.#sql) return this.#sql;
+        if (this.#sql) {
+            return this.#sql;
+        }
+        var dir;
+        var {
+            statementType,
+            clause,
+            type,
+            database,
+            table,
+            column, 
+            schema,
+            alias,
+            operator,
+            placeholder,
+            direction,
+            ondatabase,
+            ontable,
+            oncolumn
+        } = this;
+        
+        // console.log(
+        //     '\nSTMT TYPE :', statementType, 
+        //     '\nCLAUSE    :', clause, 
+        //     '\nTYPE      :', type,
+        //     '\nDATABASE  :', database,
+        //     '\nTABLE     :', table,
+        //     '\nCOLUMN    :', column,
+        //     '\nSCHEMA    :', schema,
+        //     '\n'
+        // );
 
-        var { table, column, schema, alias, operator, placeholder, direction, ontable, oncolumn } = this;
-
-        switch (this.clause) {
-
+        switch (clause) {
             case 'select':
-                alias = (alias || column);
-                return `${schema} AS ${alias}`;
+                return `${schema}${alias ? ' AS ' + alias : ''}`;
             case 'update':
             case 'set':
-                return `${schema} = ${placeholder}`;
-            case 'insert': 
-            case 'into': 
-            case 'delete':
-                return `${schema}`;
+                if (type == 'column') {
+                    this.#sql = `${schema} = ${placeholder}`;
+                } else {
+                    this.#sql = `${schema}`;
+                }
+                break;
+            case 'insert':
+            case 'into':
+                this.#sql = `${schema}`;
+                break;
+            case 'on':
+                this.#sql = `${schema} ${operator} ${ontable}.${oncolumn}`;
+                break;
             case 'where':
-                return `${schema} ${operator} ${placeholder}`;
+                this.#sql = `${schema} ${operator} ${placeholder}`;
+                break;
+            case 'delete':
+                this.#sql = `${schema}`;
+                break;
             case 'from':
-                return `${table} AS ${alias}`;
+                if (statementType == 'delete') {
+                    this.#sql = `${schema}`;
+                } else {
+                    this.#sql = `${schema}${alias ? ' AS' + alias: ''}`;
+                }
+                break;
             case 'values':
-                return `${table}`;
+                this.#sql = `${table}`;
+                break;
             case 'join':
-            case 'left_join':
-            case 'left_inner_join':
-            case 'left_outer_join':
-            case 'right_join':
-            case 'right_inner_join':
-            case 'right_outer_join':
-                direction = (direction == 'JOIN' ? '' : direction + ' ');
-                placeholder = placeholder || (ontable + '.' + oncolumn);
-                return `${direction}JOIN ${table} ON ${table}.${column} ${operator} ${ontable + '.' + oncolumn}`;
+                var dir          = (!direction ? '  join' : direction + ' join').toUpperCase();
+                var db           = database ? database + '.' : '';
+                var joinSchema   = `${db}${table}.${column}`;
+                var onDb         = ondatabase ? ondatabase + '.' : '';
+                var joinOnSchema = placeholder.length > 1 && placeholder || `${onDb}${ontable}.${oncolumn}`;
+                
+                this.#sql = `${dir} ${db}${table} ON ${joinSchema} ${operator || '='} ${joinOnSchema}`;
+                break;
             case 'group_by': 
-                return `${schema}`;
+                this.#sql = `${schema}`;
+                break;
             case 'order_by': 
-                direction = (direction || 'ASC');
-                return `${schema} ${direction}`;
+                dir = (direction || 'ASC');
+                this.#sql = `${schema} ${dir}`;
+                break;
             case 'limit' :
             case 'offset' :
-                return `?`;
+                this.#sql = `?`;
+                break;
         }
+        return this.#sql;
     }
     
     constructor(config = {}) {
-        config = Object.assign({}, 
+        config = Object.assign(
+            {
+
+            }, // config
             {
                 type: 'sql'
-            }, 
-            config
+            },
+            config // passed in config
         );
+        
         var fields = Object.keys(config);
         fields.forEach(field => this[field] = config[field]);
     }

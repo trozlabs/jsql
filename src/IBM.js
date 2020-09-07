@@ -3,19 +3,8 @@ const { EventEmitter } = require('events');
 class IBM extends EventEmitter {
     
     static defaults = {
-        connection: null,
-        eradaniConnect: {},
-        machineName: '*LOCAL',
-        username: 'TEST', 
-        password: 'eradani', 
-        options: {
-            host: 'localhost',
-            port: 57700,
-            path: '/cgi-bin/xmlcgi.pgm', 
-            debug: true,
-            usePOST: true
-        }
-    }
+        connection: null
+    };
 
     logging = true;
 
@@ -33,15 +22,7 @@ class IBM extends EventEmitter {
             options: Object.assign({}, this.#self.defaults.options, (config.options || {}))
         });
 
-        // this.#log(config);
-        
-        // try {
-        //     if (!config.eradaniConnect) config.eradaniConnect = require('@eradani-inc/eradani-connect');
-        // } catch (e){
-        //     console.error('mysql required. `npm i eradani-connect`', e);
-        //     throw e;
-        // }
-
+        this.#log(config);
         this.#config = config;
         this.#self = this.constructor;
         this.#cache = new Map();
@@ -64,10 +45,13 @@ class IBM extends EventEmitter {
             if (useCache && this.#cache.has('results')) {
                 return this.#cache.get('results', results);
             }
-            const { eradaniConnect, machineName, username, password, options, odbc } = this.#config;
+            // const { eradaniConnect, machineName, username, password, options, odbc } = this.#config;
             const connection = new eradaniConnect.transports.Odbc(odbc, options);
-            const request = new eradaniConnect.run.Sql(sql, { params: model });
-            const results = await connection.execute(request, params);
+            const request = new this.#config.connection.run.Sql(sql, { params: model });
+            if (!this.#config.connection) throw new Error('Connection not defined');
+            // const request = new this.#config.connection.run.Sql(sql, { params: model });
+            const results = await this.#config.connection.execute(request, params);
+            
             if (useCache) {
                 this.#cache.set('results', results);
             }

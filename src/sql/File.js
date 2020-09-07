@@ -12,8 +12,8 @@ class File {
         if (typeof config === 'string') {
             this.#path = config;
         } else {
-            this.#db = config.db || null;
-            this.#path = config.path || null;
+            this.#db     = config.db     || null;
+            this.#path   = config.path   || null;
             this.#params = config.params || [];
         }
         return this;

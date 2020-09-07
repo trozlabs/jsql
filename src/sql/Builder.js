@@ -2,8 +2,8 @@ const { PLACEHOLDER, OPERATOR } = require('../constants');
 const Fragment = require('./Fragment');
 
 const EOL = '\n';
-const TAB = '\t';
 const SPACE = ' ';
+const TAB = SPACE + SPACE + SPACE + SPACE; // fancy code
 const COMMA = ',';
 
 class Builder {
@@ -14,10 +14,27 @@ class Builder {
     static IBMPARAMS = 'IBMPARAMS';
     static ARRAY     = 'ARRAY';
     static OBJECT    = 'OBJECT';
-    
+
+    static SQL       = 'sql';
     static CLAUSE    = 'cluase';
     static TABLE     = 'table';
     static COLUMN    = 'column';
+
+    static ASC  = 'ASC';
+    static DESC = 'DESC';
+    
+    config = {
+        defaults: {
+            database: undefined,
+            table: undefined
+        }
+    };
+
+    // wip
+    last = {
+        statement: undefined,
+        clause: undefined
+    };
 
     #statementType = 'none';
     #index = 0;
@@ -25,16 +42,11 @@ class Builder {
     #fragments = [];
     #statement = [];
     #params = [];
-    #fragmentType = {
-        CLAUSE: 'clause',
-        TABLE: 'table',
-        COLUMN: 'column',
-    };
     #delimeter = {
         select           : COMMA + SPACE,
-        insert           : '' ,
-        update           : '' ,
-        delete           : '',
+        insert           : SPACE,
+        update           : SPACE,
+        delete           : SPACE,
         set              : COMMA,
         into             : SPACE,
         values           : COMMA + SPACE,
@@ -46,6 +58,7 @@ class Builder {
         left_join        : SPACE,
         left_outer_join  : SPACE,
         left_inner_join  : SPACE,
+        on               : SPACE + 'AND' + SPACE,
         where            : SPACE + 'AND' + SPACE,
         group_by         : COMMA + SPACE,
         order_by         : COMMA + SPACE,
@@ -68,6 +81,8 @@ class Builder {
         left_join        : '',
         left_outer_join  : '',
         left_inner_join  : '',
+        on               : 'ON',
+        and              : 'AND',
         where            : 'WHERE',
         group_by         : 'GROUP BY',
         order_by         : 'ORDER BY',
@@ -75,405 +90,740 @@ class Builder {
         offset           : 'OFFSET',
     };
     #steps = {
-        none  : ['update','set','values','select','from','join','where','group_by','order_by','limit','offset'],
+        // new solution. just add each clause to know the build steps.
+        custom: [],
+        // keeping these for now but deprecated.
+        none  : ['update','set','values','select','from','join','on','where','group_by','order_by','limit','offset'],
         select: ['select','from','join','where','group_by','order_by','limit','offset'],
         update: ['update','set','where','limit'],
         insert: ['insert','into','values'],
         delete: ['delete','from','where','limit']
     };
 
+    constructor(config = {}) {
+        this.config = Object.assign(this.config, config)
+    }
+
+    track({ clause, statement, fragment } = {}) {
+        
+        if (clause) {
+            this.#currentClause = clause;
+            this.last.clause = clause;
+            if (this.#steps.custom[this.#steps.custom.length-1] != clause) {
+                this.#steps.custom.push(clause);
+            }
+        }
+        if (statement) {
+            this.last.statement = statement;
+        }
+        if (fragment) {
+            this.last.fragment = fragment;
+        }
+        // console.log('CUSTOM STEPS:', this.#steps.custom);
+        return this.last;
+    }
+
     select() {
-        this.#statementType = 'select';
-        this.#currentClause = 'select';
+        this.track({ statement: 'select', clause: 'select' });
+
         if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
         return this;
     }
     update() {
-        this.#statementType = 'update';
-        this.#currentClause = 'update';
+        this.track({ statement: 'update', clause: 'update' });
+
         if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
         return this;
     }
     insert() {
-        this.#statementType = 'insert';
-        this.#currentClause = 'insert';
+        this.track({ statement: 'insert', clause: 'insert' });
+
         if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
         return this;
     }
     delete() {
-        this.#statementType = 'delete';
-        this.#currentClause = 'delete';
+        this.track({ statement: 'delete', clause: 'delete' });
+
         if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
         return this;
     }
+
     from() {
-        this.#currentClause = 'from';
+        this.track({ clause: 'from' });
+        
         if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
         return this;
     }
     into() {
-        this.#currentClause = 'into';
+        this.track({ clause: 'into' });
+
         if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
         return this;
     }
     set() {
-        this.#currentClause = 'set';
+        this.track({ clause: 'set' });
+
         if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
         return this;
     }
+    on() {
+        this.track({ clause: 'on' });
+    
+        if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
+        return this;
+    }
+
     values() {
-        this.#currentClause = 'values';
+        this.track({ clause: 'values' });
+
         if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
         return this;
     }
-    join() {
-        this.#currentClause = 'join';
-        if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
+    
+    join(direction = '') {
+        this.direction = direction.toUpperCase();
+        this.track({ clause: 'join' });
         return this;
     }
-    left() {
-        this.#currentClause = 'left_join';
-        if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
-        return this;
-    }
-    right() {
-        this.#currentClause = 'right_join';
-        if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
-        return this;
-    }
+
     where() {
-        this.#currentClause = 'where';
+        this.track({ clause: 'where' });
         if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
         return this;
     }
     group() {
-        this.#currentClause = 'group_by';
+        this.track({ clause: 'group_by' });
+
         if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
         return this;
     }
     order() {
-        this.#currentClause = 'order_by';
+        this.track({ clause: 'order_by' });
+
         if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
         return this;
     }
+
     limit(limit) {
-        this.#currentClause = 'limit';
+        this.track({ clause: 'limit' });
+
+        var length = arguments.length;
+        var clause = this.#currentClause;
+        var fragmentType = Builder.SQL;
+        var statementType = this.#statementType;
+        var options = {
+            statementType,
+            clause,
+            type: fragmentType,
+            database: this.config.defaults.database,
+        };
+
         return this.add({ column: 'limit', column: 'LIMIT', values: limit });
     }
     offset(offset) {
-        this.#currentClause = 'offset';
+        this.track({ clause: 'offset' });
+
+        var length = arguments.length;
+        var clause = this.#currentClause;
+        var fragmentType = Builder.SQL;
+        var statementType = this.#statementType;
+        var options = {
+            statementType,
+            clause,
+            type: fragmentType,
+            database: this.config.defaults.database,
+        };
+        
         return this.add({ type: 'clause', column: 'OFFSET', values: offset });
     }
     page(page, limit) {
         this.limit(limit);
         this.offset(limit * (page - 1));
+        
         return this;
     }
 
+    and() {
+        var { clause } = this.track();
+        this.raw({ clause, type: Builder.SQL, sql: 'AND' });
+        return this;
+    }
+
+    /**
+     * ```
+     * .from()
+     *  .table(sql)
+     *  .table(table)
+     *  .table(table, alias)
+     *  .table(database, table, alias)
+     *  .table({ 
+     *      database, 
+     *      table, 
+     *      alias 
+     *  })
+     * 
+     * .join()
+     *  .table(table, column, ontable, oncolumn)
+     *  .table(table, column, operator, ontable, oncolumn)
+     *  .table(database, table, column, operator, ondatabase, ontable, oncolumn)
+     *  .table({
+     *      direction,
+     *      database,
+     *      table,
+     *      column,
+     *      operator,
+     *      ondatabase,
+     *      ontable,
+     *      oncolumn
+     *  })
+     * 
+     * .update()
+     *  .table(sql)
+     *  .table(table, values)
+     *  .table(table, values)
+     * ```
+     */
     table() {
-        var options = this.options(arguments, this.#fragmentType.TABLE);
-        var clause = options.clause;
-        
+        var length = arguments.length;
+        var { clause } = this.track();
+        var fragmentType = Builder.TABLE;
+        var statementType = this.#statementType;
+        var argsIsOptions = length === 1 && this.type(arguments[0], 'object');
+        var options = {
+            statementType,
+            clause,
+            type: fragmentType,
+            database: this.config.defaults.database,
+            table: this.config.defaults.table
+        };
+
+        if (this.type(arguments[0], 'object')) {
+            options = Object.assign(options, arguments[0]);
+            
+            return this.add(options);
+        }
+
         // FROM:
-        if (clause === 'from') {
-
-            if (arguments.length == 1) {
-                options.table = arguments[0];
+        if (clause.endsWith('from')) {
+            let argIdx = 0;
+            
+            if (length == argIdx++) {
+                console.warn('SQL.Builder [WARNING]: no arguments for from().table()');
             }
 
-            if (arguments.length == 2) {
-                options.table = arguments[0];
-                options.alias = arguments[1];
+            if (length == argIdx++) {
+                let idx = 0;
+                options.table    = arguments[idx++];
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.database = arguments[idx++];
+                options.table    = arguments[idx++];
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.database = arguments[idx++];
+                options.table    = arguments[idx++];
+                options.alias    = arguments[idx++];
             }
 
-            if (arguments.length > 2) {
-                console.warn('too many arguments for from().table')
+            if (length > argIdx) {
+                console.warn('SQL.Builder [WARNING]: too many arguments for from().table');
             }
         }
         
         // JOINS:
         if (clause.endsWith('join')) {
-            var direction = clause.toUpperCase().split('_')[0];
-        
-            if (arguments.length == 1) {
-                options.table = arguments[0];
+            let argIdx = 0;
+            options.direction = this.direction;
+            if (length == argIdx++) {
+                console.warn('SQL.Builder [WARNING]: missing arguments');
             }
 
-            if (arguments.length == 4) {
-                options.direction = direction;
-                options.table     = arguments[0];
-                options.column    = arguments[1];
-                options.operator  = '=';
-                options.ontable   = arguments[2];
-                options.oncolumn  = arguments[3];
+            // 1
+            if (length == argIdx++) {
+                let idx = 0;
+                options.sql = arguments[idx++];
+            }
+            // 2
+            if (length == argIdx++) {
+                console.warn('SQL.Builder [WARNING]: missing arguments');
+            }
+            // 3
+            if (length == argIdx++) {
+                console.warn('SQL.Builder [WARNING]: missing arguments');
+            }
+            // 4
+            if (length == argIdx++) {
+                let idx = 0;
+                options.direction  = this.direction;
+                
+                options.table      = arguments[idx++];
+                options.column     = arguments[idx++];
+                
+                options.operator   = '=';
+
+                options.ontable    = arguments[idx++];
+                options.oncolumn   = arguments[idx++];
+            }
+            // 5
+            if (length == argIdx++) {
+                let idx = 0;
+                options.direction  = this.direction;
+                
+                options.table      = arguments[idx++];
+                options.column     = arguments[idx++];
+                
+                options.operator   = arguments[idx++];
+                
+                options.ontable    = arguments[idx++];
+                options.oncolumn   = arguments[idx++];
+            }
+            // 6
+            if (length == argIdx++) {
+                let idx = 0;
+                options.direction  = this.direction;
+
+                options.database   = arguments[idx++];
+                options.table      = arguments[idx++];
+                options.column     = arguments[idx++];
+                
+                options.operator   = '=';
+
+                options.ondatabase = arguments[idx++];
+                options.ontable    = arguments[idx++];
+                options.oncolumn   = arguments[idx++];
+            }
+            // 7
+            if (length == argIdx++) {
+                let idx = 0;
+                options.direction  = this.direction;
+                
+                options.database   = arguments[idx++];
+                options.table      = arguments[idx++];
+                options.column     = arguments[idx++];
+                
+                options.operator   = arguments[idx++];
+                
+                options.ondatabase = arguments[idx++];
+                options.ontable    = arguments[idx++];
+                options.oncolumn   = arguments[idx++];
             }
 
-            if (arguments.length == 5) {
-                options.direction = direction;
-                options.table     = arguments[0];
-                options.column    = arguments[1];
-                options.operator  = arguments[2];
-                options.ontable   = arguments[3];
-                options.oncolumn  = arguments[4];
-            }
-
-            if (arguments.length > 5) {
-                console.warn('too many arguments for join().table')
+            if (length > argIdx) {
+                console.warn('SQL.Builder [WARNING]: too many arguments for join().table');
             }
         }
         
         // UPDATE:
-        if (clause.endsWith('update')) {
+        if (statementType.endsWith('update') || clause.endsWith('set')) {
+            let argIdx = 0;
             
-            if (arguments.length == 1) {
-                options.table = arguments[0];
+            if (length == argIdx++) {
+                console.warn('SQL.Builder [WARNING]: missing arguments');        
             }
-            
-            if (arguments.length == 2) {
-                options.table    = arguments[0];
-                options.operator = '=';
-                options.alias    = arguments[1];
+            // 1
+            if (length == argIdx++) {
+                let idx = 0;
+                options.table    = arguments[idx++];
             }
-            
-            if (arguments.length == 3) {
-                options.table  = arguments[0];
-                options.column = arguments[1];
-                options.operator = '=';
-                options.values = arguments[2];
+            // 2
+            if (length == argIdx++) {
+                let idx = 0;
+                options.database = arguments[idx++];
+                options.table    = arguments[idx++];
             }
 
-            if (arguments.length > 3) {
-                console.warn('too many arguments for update.table')
+            if (length > argIdx) {
+                console.warn('SQL.Builder [WARNING]: too many arguments for update().table()');
             }
         }
         
         // INSERT:
-        if (clause.endsWith('into')) {
+        if (statementType.endsWith('insert') || clause.endsWith('into')) {
+            let argIdx = 0;
             
-            if (arguments.length == 1) {
-                options.table = arguments[0];
+            if (length == argIdx++) {
+                console.warn('SQL.Builder [WARNING]: missing arguments');        
+            }
+            // 1
+            if (length == argIdx++) {
+                let idx = 0;
+                options.table = arguments[idx++];
+            }
+            // 2
+            if (length == argIdx++) {
+                let idx = 0;
+                options.database = arguments[idx++];
+                options.table = arguments[idx++];
+            }
+            
+            if (length > argIdx) {
+                console.warn('SQL.Builder [WARNING]: too many arguments for update.table')
+            }
+        }
+        
+        // DELETE:
+        if (statementType.endsWith('delete') || clause.endsWith('delete')) {
+            let argIdx = 0;
+            
+            if (length == argIdx++) {
+                console.warn('SQL.Builder [WARNING]: missing arguments');        
+            }
+            // 1
+            if (length == argIdx++) {
+                let idx = 0;
+                options.table    = arguments[idx++];
+            }
+            // 2
+            if (length == argIdx++) {
+                let idx = 0;
+                options.database = arguments[idx++];
+                options.table    = arguments[idx++];
             }
 
-            if (arguments.length > 1) {
-                console.warn('too many arguments for update.table')
+            if (length > argIdx) {
+                console.warn('SQL.Builder [WARNING]: too many arguments for update.table')
             }
         }
 
-        // console.log(options)
         return this.add(options);
     }
     
     column() {
-        var options = this.options(arguments, this.#fragmentType.COLUMN);
-        var clause = options.clause;
-        
+        var length = arguments.length;
+        var clause = this.#currentClause;
+        var fragmentType = Builder.COLUMN;
+        var statementType = this.#statementType;
+        var argsIsOptions = length === 1 && this.type(arguments[0], 'object');
+        var options = {
+            statementType,
+            clause,
+            type: fragmentType,
+            database: this.config.defaults.database,
+            table: this.config.defaults.table
+        };
+
+        if (argsIsOptions) {
+            options = Object.assign(options, arguments[0]);
+            return this.add(arguments[0]);
+        }
+
         // SELECT
         if (clause === 'select') {
-            
-            if (arguments.length == 1) {
-                options.column = arguments[0];
-            }
+            let argIdx = 0;
 
-            if (arguments.length == 2) {
-                options.column = arguments[0];
-                options.alias  = arguments[1];
+            if (length == argIdx++) {
+                console.warn('SQL.Builder [WARNING]: No arguments');
             }
-
-            if (arguments.length == 3) {
-                options.table  = arguments[0];
-                options.column = arguments[1];
-                options.alias  = arguments[2];
+            if (length == argIdx++) {
+                let idx = 0;
+                options.column = arguments[idx++];
             }
-
-            if (arguments.length > 3) {
-                console.warn('too many arguments for select.column')
+            if (length == argIdx++) {
+                let idx = 0;
+                options.database = this.config.defaults.database;
+                options.table   = arguments[idx++];
+                options.column  = arguments[idx++];
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.database = this.config.defaults.database;
+                options.table    = arguments[idx++];
+                options.column   = arguments[idx++];
+                options.alias    = arguments[idx++];
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.database  = arguments[idx++];
+                options.table     = arguments[idx++];
+                options.column    = arguments[idx++];
+                options.alias     = arguments[idx++];
+            }
+            if (length > argIdx) {
+                console.warn('SQL.Builder [WARNING]: too many arguments for select.column');
             }
         }
 
         // WHERE
         if (clause === 'where') {
-
-            if (arguments.length == 1) {
-                options.column = arguments[0];
+            let argIdx = 0;
+            
+            if (length == argIdx++) {
+                console.warn('SQL.Builder [WARNING]: No arguments');
             }
-
-            if (arguments.length == 2) {
-                options.column = arguments[0];
-                options.values = arguments[1];
+            if (length == argIdx++) {
+                let idx = 0;
+                options.sql = arguments[idx++];
             }
-
-            if (arguments.length == 3) {
-                options.column   = arguments[0];
-                options.operator = arguments[1];
-                options.values   = arguments[2];
+            if (length == argIdx++) {
+                let idx = 0;
+                options.column   = arguments[idx++];
+                options.operator = '=';
+                options.values   = arguments[idx++];
             }
-
-            if (arguments.length == 4) {
-                options.table    = arguments[0];
-                options.column   = arguments[1];
-                options.operator = arguments[2];
-                options.values   = arguments[3];
+            if (length == argIdx++) {
+                let idx = 0;
+                options.column   = arguments[idx++];
+                options.operator = arguments[idx++];
+                options.values   = arguments[idx++];
             }
-
-            if (arguments.length > 4) {
-                console.warn('too many arguments for where.column')
+            if (length == argIdx++) {
+                let idx = 0;
+                options.table    = arguments[idx++];
+                options.column   = arguments[idx++];
+                options.operator = arguments[idx++];
+                options.values   = arguments[idx++];
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.database = arguments[idx++];
+                options.table    = arguments[idx++];
+                options.column   = arguments[idx++];
+                options.operator = arguments[idx++];
+                options.values   = arguments[idx++];
+            }
+            if (length > argIdx) {
+                console.warn('SQL.Builder [WARNING]: too many arguments for where.column');
             }
         }
         
-        // INSERT
-        if (clause === 'values') {
-            if (arguments.length == 1) {
-                options.sql    = arguments[0];
+        // JOIN TABLE ON COLUMN
+        if (clause === 'join' || clause === 'on') {
+            let argIdx = 0;
+
+            if (length == argIdx++) {
+                console.warn('SQL.Builder [WARNING]: No arguments');
             }
-            if (arguments.length == 2) {
-                options.column = arguments[0];
-                options.values = arguments[1];
+            if (length == argIdx++) {
+                let idx = 0;
+                options.sql = arguments[idx++];
             }
-            if (arguments.length > 2) {
-                console.warn('too many arguments for values().column()');
+            if (length == argIdx++) {
+                let idx = 0;
+                options.table    = arguments[idx++];
+                options.column   = arguments[idx++];   
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.table    = arguments[idx++];
+                options.column   = arguments[idx++];
+                options.operator = '=';
+                options.placeholder = arguments[idx++];
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.table    = arguments[idx++];
+                options.column   = arguments[idx++];
+                options.operator = '=';
+                options.ontable  = arguments[idx++];
+                options.oncolumn = arguments[idx++];
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.table    = arguments[idx++];
+                options.column   = arguments[idx++];
+                options.operator = arguments[idx++];
+                options.ontable  = arguments[idx++];
+                options.oncolumn = arguments[idx++];
+            }
+            if (length > argIdx) {
+                console.warn('SQL.Builder [WARNING]: too many arguments for on.column');
             }
         }
 
+        // INSERT
+        if (clause === 'insert' || clause === 'into' || clause === 'values') {
+            let argIdx = 0;
+            
+            if (length == argIdx++) {
+                console.warn('SQL.Builder [WARNING]: No arguments');
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.sql     = arguments[idx++];
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.column  = arguments[idx++];
+                options.values  = arguments[idx++];
+            }
+
+            if (length > argIdx) console.warn('SQL.Builder [WARNING]: too many arguments for values().column()');
+        }
+
         // UPDATE
-        if (clause === 'set') {
+        if (clause === 'update' || clause === 'set') {
+            let argIdx = 0;
             
-            if (arguments.length == 1) {
-                options.sql = arguments[0];
+            if (length == argIdx++) {
+                console.warn('SQL.Builder [WARNING]: No arguments');
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.table = arguments[idx++];
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.column   = arguments[idx++];
+                options.values   = arguments[idx++];
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.table    = arguments[idx++];
+                options.column   = arguments[idx++];
+                options.operator = '=';
+                options.values   = arguments[idx++];
             }
 
-            if (arguments.length == 2) {
-                options.column   = arguments[0];
-                options.operator = '=';
-                options.values   = arguments[1];
-            }
-            
-            if (arguments.length == 3) {
-                options.table    = arguments[0];
-                options.column   = arguments[1];
-                options.operator = '=';
-                options.values   = arguments[2];
-            }
-
-            if (arguments.length > 3) {
-                console.warn('too many arguments for order.column')
-            }
+            if (length > argIdx) console.warn('SQL.Builder [WARNING]: too many arguments for order.column');
         }
 
         // GROUP BY
         if (clause === 'group_by') {
-            console.log(options);    
-            if (arguments.length == 1) {
-                options.column = arguments[0];
+            let argIdx = 0;
+            
+            if (length == argIdx++) {
+                console.warn('SQL.Builder [WARNING]: No arguments');
             }
-            if (arguments.length == 2) {
-                options.table  = arguments[0];
-                options.column = arguments[1];
+            if (length == argIdx++) {
+                let idx = 0;
+                options.column = arguments[idx++];
             }
-            if (arguments.length == 3) {
-                options.database = arguments[0];
-                options.table    = arguments[1];
-                options.column   = arguments[2];
+            if (length == argIdx++) {
+                let idx = 0;
+                options.table  = arguments[idx++];
+                options.column = arguments[idx++];
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.database = arguments[idx++];
+                options.table    = arguments[idx++];
+                options.column   = arguments[idx++];
             }
 
-            if (arguments.length > 3) {
-                console.warn('too many arguments for group.column')
-            }
+            if (length > argIdx) console.warn('SQL.Builder [WARNING]: too many arguments for group.column');
         }
 
         // ORDER BY
         if (clause === 'order_by') {
-            console.log(options);
-            if (arguments.length == 1) {
-                options.column = arguments[0];
+            let argIdx = 0;
+            
+            if (length == argIdx++) {
+                console.warn('SQL.Builder [WARNING]: No arguments');
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.column      = arguments[idx++];
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.column      = arguments[idx++];
+                options.direction   = arguments[idx++];
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.table       = arguments[idx++];
+                options.column      = arguments[idx++];
+                options.direction   = arguments[idx++];
             }
 
-            if (arguments.length == 2) {
-                options.column    = arguments[0];
-                options.direction = arguments[1];
-            }
-
-            if (arguments.length == 3) {
-                options.table     = arguments[0];
-                options.column    = arguments[1];
-                options.direction = arguments[2];
-            }
-
-            if (arguments.length > 3) {
-                console.warn('too many arguments for order.column')
-            }
+            if (length > argIdx) console.warn('SQL.Builder [WARNING]: too many arguments for order.column')
         }
         
         return this.add(options);
     }
-    
-    options(args, type) {
-        var args = Array.from(args);
-        var length = args.length;
-        var isOptions = (this.type(args[0], 'object') && length == 1);
-        var isSql = (this.type(args[0], 'string') && length == 1);
-        var sql = isSql ? args[0] : undefined;
-        var options = isOptions ? args[0] : { };
-
-        options = Object.assign({
-            statement: type,
-            clause: this.#currentClause,
-            sql: sql
-        }, options);
-        // console.log(options);
-        return options;
-    }
 
     raw(sql) {
-        return this.add({ sql });
+        var length = arguments.length;
+        var clause = this.#currentClause;
+        var fragmentType = Builder.SQL;
+        var statementType = this.#statementType;
+        var options = {
+            statementType,
+            clause,
+            sql,
+            type: fragmentType,
+            database: this.config.defaults.database,
+        };
+        return this.add(options);
     }
-
+    
     add(options) {
-        
         if (!this.type(options, 'object')) {
-            console.log('Error: invalid options:', options);
+            console.warn('Error: invalid options:', options);
             throw new Error('add only accepts an options object but received: ', options);
         }
 
         var {
-            clause, // the part of the query this belongs to
-            type, // the type
-            sql,                                                    // string
-            table, column, alias, operator, placeholder,            // strings
-            values,                                                 // object
-            ontable, oncolumn, direction,                           // string
-            columns, tables                                         // arrays
+            clause,
+            statementType,
+            type,
+            sql,
+            database,
+            table,
+            column,
+            alias,
+            operator,
+            placeholder,
+            values,
+            direction,
+            onsql,
+            ondatabase,
+            ontable,
+            oncolumn,
+            
+            items,
+            columns,
+            tables
         } = options;
         
-        // when options contains a columns array recursively call add.
         if (columns) {
             (Array.isArray(columns) ? columns : [ columns ]).forEach(options => this.add(options));
             return this;
         }
-        // when options contains a tables array recursively call add.
         if (tables) {
             (Array.isArray(tables) ? tables : [ tables ]).forEach(options => this.add(options));
+            return this;
+        }
+        if (items) {
+            (Array.isArray(items) ? items : [ items ]).forEach(options => this.add(options));
             return this;
         }
 
         clause = clause || this.#currentClause;
 
         var index = this.#index++;
+        var direction = this.direction;
 
         options = {
-            type, clause,
             index,
-            sql, table, column, alias, operator, direction, placeholder, 
-            ontable, oncolumn, 
-            values 
+            statementType,
+            clause,
+            type, 
+            sql,
+            database, 
+            table, 
+            column, 
+            alias,
+            operator, 
+            placeholder, 
+            direction,
+            onsql, 
+            ondatabase, 
+            ontable,
+            oncolumn,
+            values
         };
 
         var fragment = new Fragment(options);
 
         this.#fragments.push(fragment);
+        this.direction = undefined;
 
         return this;
     }
-
+    
     type(obj, type) {
         var result;
 
@@ -489,7 +839,7 @@ class Builder {
 
         return result;
     }
-
+    
     paramsAllowed(clause) {
         
         switch (clause) {
@@ -499,33 +849,26 @@ class Builder {
             case 'limit':
             case 'offset':
                 return true;
-            case 'order_by':
-            case 'group_by':
-            case 'select':
-            case 'update':
-            case 'insert':
-            case 'into':
             default:
                 return false;
         }
     }
-
+    
     build() {
         const delimeter     = this.#delimeter;
         const statementType = this.#statementType || 'none';
-        const steps         = this.#steps[statementType];
+        const steps         = this.#steps.custom;
         const statement     = [];
         const parameters    = [];
-        
+
         for (let step of steps) {
-            
-            const fragments = this.#fragments.filter(fragment => (fragment.clause.endsWith(step)));
+            const fragments = this.#fragments.filter(fragment => fragment.clause.endsWith(step));
             const statementClause = [];
             var sql;
-            console.log(step, fragments)
+
             /**
              * Special handling of insert statements due to ...( A, B, C ) VALUES ( ?, ?, ? )
-             */            
+             */
             if (step === 'values') {
                 
                 const columns = [];
@@ -561,7 +904,7 @@ class Builder {
             } else {
 
                 fragments.forEach((fragment, index, fragments) => {
-
+                    
                     if (this.paramsAllowed(fragment.clause)) {
 
                         if (!fragment.values || !fragment.values.length) return;
@@ -576,7 +919,6 @@ class Builder {
                             });
                         });
                     }
-                    console.log(fragment.sql)
                     statementClause.push(fragment.sql);
                 });
 
@@ -591,7 +933,7 @@ class Builder {
 
         return this;
     }
-
+    
     params(returnType) {
         
         if (returnType == Builder.IBMMODEL) {
@@ -613,7 +955,7 @@ class Builder {
         else if (returnType == Builder.ARRAY) {
             let params = [];
             for (let param in this.#params) {
-                console.log(this.#params[param].values);
+                // console.log(this.#params[param].values);
                 params.push(this.#params[param].values);
             }
             return params;
@@ -625,26 +967,56 @@ class Builder {
 
         return this.#params;
     }
-    
+
     sql(format) {
         
         if (!this.#statement.length) this.build();
         var statement = this.#statement.join(SPACE);
-        const TAB_SPACE = SPACE + SPACE + SPACE + SPACE;
         if (format) {
-            statement = statement.replace('SELECT ',        EOL + 'SELECT' + EOL + TAB_SPACE);
-            statement = statement.replace(', ',             ', ' +  EOL + TAB_SPACE);
-            statement = statement.replace(' FROM ',         EOL + 'FROM ');
-            statement = statement.replace('  JOIN ',        EOL + 'JOIN ');
-            statement = statement.replace('LEFT JOIN',      EOL + 'LEFT JOIN');
-            statement = statement.replace('RIGHT JOIN',     EOL + 'RIGHT JOIN');
-            statement = statement.replace(' ON ',           EOL + TAB_SPACE + 'ON ');
-            statement = statement.replace(' WHERE ',        EOL + 'WHERE ' + EOL + TAB_SPACE);
-            statement = statement.replace(' AND ',          EOL + TAB_SPACE + 'AND ');
-            statement = statement.replace(' LIMIT ',        EOL + 'LIMIT ');
-            statement = statement.replace(' OFFSET ',       EOL + 'OFFSET ');
+            statement = statement.replace('SELECT',      EOL + 'SELECT' + EOL + TAB);
+            statement = statement.replace(' UPDATE ',    EOL + 'UPDATE' + EOL + TAB);
+            statement = statement.replace(' SET ',       EOL + 'SET' + EOL + TAB);
+            statement = statement.replace('INSERT INTO', EOL + 'INSERT INTO' + EOL + TAB);
+            statement = statement.replace(' DELETE ',    EOL + 'DELETE');
+            statement = statement.replace(' FROM ',      EOL + 'FROM ');
+            statement = statement.replace(' WHERE ',     EOL + 'WHERE ' + EOL + TAB);
+            statement = statement.replace(' ORDER BY ',  EOL + 'ORDER BY' + EOL + TAB);
+            statement = statement.replace(' GROUP BY ',  EOL + 'GROUP BY' + EOL + TAB);
+            statement = statement.replace(' LIMIT ',     EOL + 'LIMIT ');
+            statement = statement.replace(' OFFSET ',    EOL + 'OFFSET ');
+            statement = statement.split(' LEFT JOIN ')  .join(EOL + 'LEFT JOIN ');
+            statement = statement.split(' RIGHT JOIN ') .join(EOL + 'RIGHT JOIN ');
+            statement = statement.split('  JOIN ')      .join(EOL + 'JOIN ');
+            statement = statement.split('FROM ')        .join('FROM' + EOL + TAB);
+            statement = statement.split(' ON ')         .join(EOL + TAB + 'ON ');
+            statement = statement.split(') VALUES (')   .join(EOL + ') VALUES (' + EOL + TAB);
+            statement = statement.split(',')            .join(',' + EOL + TAB);
+            statement = statement.split(' AND ')        .join(EOL + TAB + 'AND ');
         }
         return statement;
+    }
+
+    /**
+     * @param {Boolean} format output formatted sql statement.
+     * @returns {void}
+     */
+    log(format, paramsStyle) {
+        if (process.env.NODE_ENV === 'production') return;
+
+        const sqlStmt = this.sql(format);
+        const sqlParams = this.params(paramsStyle);
+
+        console.log('\nSQL    :==========================================================\n');
+        console.log(sqlStmt);
+        
+        console.log('\nPARAMS :==========================================================\n');
+        console.log('\nDEFAULT   :', this.params('OBJECT'));
+        console.log('\nARRAY     :', this.params('ARRAY'));
+        console.log('\nIBMPARAMS :', this.params('IBMPARAMS'));
+        console.log('\nIBMMODEL  :', this.params('IBMMODEL'));
+        console.log('\n==================================================================\n');
+        
+        return this;
     }
 }
 

@@ -4,3 +4,5 @@ old/
 scratch.js
 *.local
 *.log
+
+config.json

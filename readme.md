@@ -2,24 +2,81 @@
 
 **This is a rough draft.**
 
-SQL Helper Utility to handle IBM related syntax differences. 
+NodeJS Dynamica SQL Utility to work with IBM DB2, but should work with most out of the box. Support for more DB Server support on it's way.
+
+__FYI: This ReadMe is a work in progress__
 
 ## Features
 
-- Params that are undefined will be excluded from query.
+- Select, Insert, Update, Delete.
+- Partial query generation. Only want a dynamica WHERE clause? That's cool. 
+- Params that are undefined/null will be excluded from query. 
+- No counting `?`s. These will be handled for you. 
 - Append to it at any point and get updated sql.
-- Pagination.
+- Limit, Offset and Pagination using the `page(page, limit)` method.
 
+## Examples:
 
-## Example:
+### Quick Start 
 
-### Select
+```bash
+npm i https://github.com/trozlabs/jsql
+```
+
+```js
+const { SQL } = require('jsql');
+
+var builder = new SQL.Builder()
+    .select()
+        .column('id')
+        .column('name')
+        .column('desc')
+    .from()
+        .table('table')
+    .where()
+        .column('name', 'like', 'something')
+        .column('desc', 'like', null)
+    .page(1, 25)
+    .log('format');
+
+var sql = builder.sql();
+
+var params = builder.params(SQL.Builder.ARRAY); // or
+var params = builder.params(SQL.Builder.OBJECT); // or
+var model = builder.params(SQL.Builder.IBMMODEL); // or/and
+var params = builder.params(SQL.Builder.IBMPARAMS);
+```
+
+```sql
+SELECT
+    id,
+    name,
+    desc
+FROM
+    table AS table
+WHERE 
+    name LIKE CONCAT('%' || ? || '%')
+LIMIT ?
+OFFSET ?
+```
+```
+DEFAULT   : [
+  { id: 'WHERE-NAME-4', name: 'name', index: 0, values: 'something' },
+  { id: 'LIMIT-LIMIT-6', name: 'LIMIT', index: 1, values: 25 },
+  { id: 'OFFSET-OFFSET-7', name: 'OFFSET', index: 2, values: 0 }
+]
+
+ARRAY     : [ 'something', 25, 0 ]
+
+IBMPARAMS : { '0': 'something', '1': 25, '2': 0 }
+
+IBMMODEL  : [ { name: '0' }, { name: '1' }, { name: '2' } ]
+```
 
 ```js
 const { SQL, IBM, MySQL } = require('jsql');
 const { format } = require('mysql');
-var stmt;
-var query = {
+const query = {
     id: 123,
     a: 'a val',
     b: 'b val',
@@ -27,9 +84,13 @@ var query = {
     d: 'd val',
     page: 1,
     limit: 25
-}
+};
+```
 
-stmt = new SQL.Builder()
+### Select
+
+```js
+new SQL.Builder()
     .select('DISTINCT')
         .raw('(select id from some_table ) as ID')
         .column('A', 'A1')
@@ -57,37 +118,12 @@ stmt = new SQL.Builder()
         .column('C', 'DESC')
         .column('D', 'DESC')
     .page(1, 10)
-
-console.log(stmt.sql());
-console.log(stmt.params(SQL.Builder.IBMMODEL));
-console.log(stmt.params(SQL.Builder.IBMPARAMS));
+    .log('format')
 ```
-
-    SELECT     	 DISTINCT, (select id from some_table ) as ID, A AS A1, B AS B1, C AS C1, D AS D1
-    FROM       	 TABLE_ONE AS T1
-    JOIN    	 TABLE_JOIN ON TABLE_JOIN.ID = TABLE_ONE.ID 
-    RIGHT JOIN    	 TABLE_RIGHT ON TABLE_RIGHT.ID > TABLE_ONE.ID 
-    LEFT JOIN    	 TABLE_LEFT ON TABLE_LEFT.ID = TABLE_ONE.ID
-    WHERE   	 ID = ? AND A = ? AND B = ? AND D = ?
-    GROUP BY	 A, B
-    ORDER BY	 C DESC, D DESC
-    LIMIT   	 ?
-    OFFSET  	 ?
-
-    [
-        { name: '0' },
-        { name: '1' },
-        { name: '2' },
-        { name: '3' },
-        { name: '4' },
-        { name: '5' }
-    ]
-    { '0': 123, '1': 'a val', '2': 'b val', '3': 'd val', '4': 10, '5': 0 }
-
 ### Update
 
 ```js
-stmt = new SQL.Builder()
+new SQL.Builder()
     .update()
         .table('TABLE_ONE')
         .set()
@@ -98,29 +134,13 @@ stmt = new SQL.Builder()
     .where()
         .column('ID', '=', query.id)
     .limit(1)
-
-console.log(stmt.sql())
-console.log(stmt.params());
+    .log('format')
 ```
-
-    UPDATE     	 TABLE_ONE
-    SET        	 A = ?,	B = ?,	D = ?
-    WHERE   	 ID = ?
-    LIMIT   	 ?
-
-
-    [
-        { id: 'set-A-1', name: 'A', index: 0, values: 'a val' },
-        { id: 'set-B-2', name: 'B', index: 1, values: 'b val' },
-        { id: 'set-D-4', name: 'D', index: 2, values: 'd val' },
-        { id: 'where-ID-5', name: 'ID', index: 3, values: 123 },
-        { id: 'limit-LIMIT-6', name: 'LIMIT', index: 4, values: 1 }
-    ]
 
 ### Insert
 
 ```js
-stmt = new SQL.Builder()
+new SQL.Builder()
     .insert()
         .table('TABLE_ONE')
     .values()
@@ -128,37 +148,57 @@ stmt = new SQL.Builder()
         .column('B', query.b)
         .column('C', query.c)
         .column('D', query.d)
-
-console.log(stmt.sql());
-console.log(stmt.params());
+    .log('format')
 ```
-
-    INSERT INTO	 TABLE_ONE
-                ( A, B, D ) VALUES ( ?, ?, ? )
-    [
-        { id: 'values-A-1', name: 'A', index: 0, values: 'a val' },
-        { id: 'values-B-2', name: 'B', index: 1, values: 'b val' },
-        { id: 'values-D-4', name: 'D', index: 2, values: 'd val' }
-    ]
-
 
 ### Delete
 
 ```js
-stmt = new SQL.Builder()
+new SQL.Builder()
     .delete()
         .table('TABLE_ONE')
     .where()
         .column('ID', '=', 1234)
-
-console.log(stmt.sql())
-console.log(stmt.params(
+    .log('format')
 ```
 
-    DELETE FROM	 TABLE_ONE
-    WHERE   	 ID = ?
-    
-    [ 
-        { id: 'where-ID-1', name: 'ID', index: 0, values: 1234 } 
-    ]
+## Verbose Options:
+
+```js
+new SQL.Builder()
+    .select()
+        .column({
+            database: 'DB1',
+            table: 'T1',
+            column: 'A',
+            alias: 'T1_A'
+        })
+    .from()
+        .table('T1', 'T1_ALIAS')
+    .where()
+        .column({
+            database: 'DB1',
+            table: 'T1',
+            column: 'A',
+            operator: '=',
+            placeholder: '?',
+            values: 'Value 1'
+        })
+```
+
+## File
+
+```js
+var params = [];
+
+new SQL.File({ path: './some.sql' }).params(params).run().then(res => {
+    console.log(res);
+}).catch(err => {
+    console.error(err);
+});
+```
+
+
+
+
 
