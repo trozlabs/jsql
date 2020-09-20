@@ -36,13 +36,14 @@ class Builder {
         clause: undefined
     };
 
-    #statementType = 'none';
+    #statementType = 'custom';
     #index = 0;
     #currentClause = '';
     #fragments = [];
     #statement = [];
     #params = [];
     #delimeter = {
+        custom           : SPACE,
         select           : COMMA + SPACE,
         insert           : SPACE,
         update           : SPACE,
@@ -64,8 +65,11 @@ class Builder {
         order_by         : COMMA + SPACE,
         limit            : SPACE,
         offset           : SPACE,
+        with             : SPACE
     };
     #clause = {
+        none             : '',
+        pre              : '',
         select           : 'SELECT',
         insert           : 'INSERT INTO',
         into             : 'INSERT INTO',
@@ -88,20 +92,33 @@ class Builder {
         order_by         : 'ORDER BY',
         limit            : 'LIMIT',
         offset           : 'OFFSET',
+        with             : 'WITH'
     };
     #steps = {
         // new solution. just add each clause to know the build steps.
         custom: [],
         // keeping these for now but deprecated.
-        none  : ['update','set','values','select','from','join','on','where','group_by','order_by','limit','offset'],
-        select: ['select','from','join','where','group_by','order_by','limit','offset'],
-        update: ['update','set','where','limit'],
-        insert: ['insert','into','values'],
+        select: ['select','from','join','where','group_by','order_by','limit','offset','with'],
+        totals: ['select','from','join','where','group_by','order_by','with'],
+        update: ['update','set','where','limit','with'],
+        insert: ['insert','into','values','with'],
         delete: ['delete','from','where','limit']
     };
 
     constructor(config = {}) {
-        this.config = Object.assign(this.config, config)
+        this.config = Object.assign(this.config, config);
+        this.#statementType = this.config.statementType || 'custom';
+
+        // console.log(this.config)
+
+        if (this.config.pre) {
+            // this.track({ statement: 'select', clause: 'pre' });
+            this.add({
+                type: 'sql',
+                clause: 'pre',
+                sql: this.config.pre
+            });
+        }
     }
 
     track({ clause, statement, fragment } = {}) {
@@ -206,41 +223,28 @@ class Builder {
 
     limit(limit) {
         this.track({ clause: 'limit' });
-
-        var length = arguments.length;
-        var clause = this.#currentClause;
-        var fragmentType = Builder.SQL;
-        var statementType = this.#statementType;
-        var options = {
-            statementType,
-            clause,
-            type: fragmentType,
-            database: this.config.defaults.database,
-        };
-
         return this.add({ column: 'limit', column: 'LIMIT', values: limit });
     }
     offset(offset) {
         this.track({ clause: 'offset' });
-
-        var length = arguments.length;
-        var clause = this.#currentClause;
-        var fragmentType = Builder.SQL;
-        var statementType = this.#statementType;
-        var options = {
-            statementType,
-            clause,
-            type: fragmentType,
-            database: this.config.defaults.database,
-        };
-        
         return this.add({ type: 'clause', column: 'OFFSET', values: offset });
     }
+    
     page(page, limit) {
         this.limit(limit);
         this.offset(limit * (page - 1));
         
         return this;
+    }
+    /**
+     * RR - Repeatable Read
+     * RS - Read Stability
+     * CS - Cursor Stability
+     * UR - Uncommitted Read
+     */
+    with(level) {
+        this.track({ clause: 'with' });
+        return this.add({ type: 'clause', sql: level });
     }
 
     and() {
@@ -425,7 +429,7 @@ class Builder {
             // 1
             if (length == argIdx++) {
                 let idx = 0;
-                options.table    = arguments[idx++];
+                options.table = arguments[idx++];
             }
             // 2
             if (length == argIdx++) {
@@ -493,6 +497,8 @@ class Builder {
     column() {
         var length = arguments.length;
         var clause = this.#currentClause;
+        if (!clause || clause == 'pre') this.select();
+
         var fragmentType = Builder.COLUMN;
         var statementType = this.#statementType;
         var argsIsOptions = length === 1 && this.type(arguments[0], 'object');
@@ -661,7 +667,7 @@ class Builder {
             }
             if (length == argIdx++) {
                 let idx = 0;
-                options.table = arguments[idx++];
+                options.sql = arguments[idx++];
             }
             if (length == argIdx++) {
                 let idx = 0;
@@ -670,9 +676,14 @@ class Builder {
             }
             if (length == argIdx++) {
                 let idx = 0;
+                options.column   = arguments[idx++];
+                options.values   = arguments[idx++];
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.database = arguments[idx++];
                 options.table    = arguments[idx++];
                 options.column   = arguments[idx++];
-                options.operator = '=';
                 options.values   = arguments[idx++];
             }
 
@@ -730,7 +741,7 @@ class Builder {
 
             if (length > argIdx) console.warn('SQL.Builder [WARNING]: too many arguments for order.column')
         }
-        
+
         return this.add(options);
     }
 
@@ -739,12 +750,13 @@ class Builder {
         var clause = this.#currentClause;
         var fragmentType = Builder.SQL;
         var statementType = this.#statementType;
+
+        if (!clause) this.track({ clause: 'pre', fragment: fragmentType });
+        
         var options = {
             statementType,
             clause,
             sql,
-            type: fragmentType,
-            database: this.config.defaults.database,
         };
         return this.add(options);
     }
@@ -790,7 +802,7 @@ class Builder {
             (Array.isArray(items) ? items : [ items ]).forEach(options => this.add(options));
             return this;
         }
-
+        type = type || 'sql';
         clause = clause || this.#currentClause;
 
         var index = this.#index++;
@@ -853,16 +865,18 @@ class Builder {
                 return false;
         }
     }
-    
-    build() {
+
+    build(type) {
         const delimeter     = this.#delimeter;
-        const statementType = this.#statementType || 'none';
-        const steps         = this.#steps.custom;
+        const statementType = this.#statementType;
+        const steps         = ['pre', ...this.#steps[type || statementType]];
         const statement     = [];
         const parameters    = [];
-
+        
         for (let step of steps) {
+            // console.log('step:', step)
             const fragments = this.#fragments.filter(fragment => fragment.clause.endsWith(step));
+            // console.log(statementType, step, fragments);
             const statementClause = [];
             var sql;
 
@@ -901,26 +915,30 @@ class Builder {
                 
                 statementClause.push(sql);
                 
-            } else {
-
-                fragments.forEach((fragment, index, fragments) => {
+            } 
+            else {
+                if (type === 'totals' && step === 'select') {
+                    statementClause.push('COUNT(*) AS TOTALS');
+                } else {
+                    fragments.forEach((fragment, index, fragments) => {
                     
-                    if (this.paramsAllowed(fragment.clause)) {
-
-                        if (!fragment.values || !fragment.values.length) return;
-
-                        fragment.values.forEach((value) => {
+                        if (this.paramsAllowed(fragment.clause)) {
     
-                            parameters.push({
-                                id: fragment.id,
-                                name: fragment.name,
-                                index: parameters.length,
-                                values: value
+                            if (fragment.values === undefined || !fragment.values.length) return;
+    
+                            fragment.values.forEach((value) => {
+        
+                                parameters.push({
+                                    id: fragment.id,
+                                    name: fragment.name,
+                                    index: parameters.length,
+                                    values: value
+                                });
                             });
-                        });
-                    }
-                    statementClause.push(fragment.sql);
-                });
+                        }
+                        statementClause.push(fragment.sql);
+                    });
+                }
 
                 if (!statementClause.length) continue;
             }

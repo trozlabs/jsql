@@ -3,7 +3,7 @@ class Fragment {
 
     statementType;
     clause;      // select insert update delete where from group by order by
-    type;       // column, table,
+    type;        // column, table, sql
 
     database;    // database_name
     table;       // table_name
@@ -94,11 +94,11 @@ class Fragment {
         
         switch (operator.toUpperCase()) {
             case 'LIKE':
-                return `CONCAT('%' || ? || '%')`;
+                return `'%' || ? || '%'`;
             case 'STARTWITH':
-                return `CONCAT(?, '%')`;
-            case 'STARTWITH':
-                return `CONCAT('%', ?)`;
+                return `? || '%'`;
+            case 'ENDSWITH':
+                return `'%' || ?`;
             case 'BETWEEN':
                 return `? AND ?`;
             case 'IN':
@@ -119,9 +119,7 @@ class Fragment {
         this.#sql = string;
     }
     get sql () {
-        if (this.#sql) {
-            return this.#sql;
-        }
+        
         var dir;
         var {
             statementType,
@@ -150,8 +148,12 @@ class Fragment {
         //     '\nSCHEMA    :', schema,
         //     '\n'
         // );
+        if (this.#sql || clause == 'pre') {
+            return this.#sql;
+        }
 
         switch (clause) {
+            
             case 'select':
                 return `${schema}${alias ? ' AS ' + alias : ''}`;
             case 'update':
@@ -179,7 +181,7 @@ class Fragment {
                 if (statementType == 'delete') {
                     this.#sql = `${schema}`;
                 } else {
-                    this.#sql = `${schema}${alias ? ' AS' + alias: ''}`;
+                    this.#sql = `${schema}${alias ? ' AS ' + alias: ''}`;
                 }
                 break;
             case 'values':
@@ -206,6 +208,7 @@ class Fragment {
                 this.#sql = `?`;
                 break;
         }
+        
         return this.#sql;
     }
     
