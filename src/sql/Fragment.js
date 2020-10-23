@@ -1,19 +1,15 @@
 class Fragment {
     index;
-
     statementType;
     clause;      // select insert update delete where from group by order by
     type;        // column, table, sql
-
     database;    // database_name
     table;       // table_name
     column;      // column_name
     direction;   // left right inner outer asc desc
-    
     ondatabase;
     ontable;     // table to join on
     oncolumn;    // column to join on
-
     #id;
     #name;
     #operator;    // = > >= < <= <>
@@ -43,15 +39,7 @@ class Fragment {
         this.#alias = string;
     }
     get alias () {
-        var alias = this.#alias;
-        // if (!alias) {
-        //     if (this.clause == 'from' || this.clause.endsWith('join')) {
-        //         alias = this.table;
-        //     } else if (this.clause == 'select') {
-        //         alias = this.#alias;
-        //     }
-        // }
-        return alias;
+        return this.#alias;
     }
 
     set schema (string) {
@@ -119,15 +107,13 @@ class Fragment {
         this.#sql = string;
     }
     get sql () {
-        
-        var dir;
         var {
             statementType,
             clause,
             type,
             database,
             table,
-            column, 
+            column,
             schema,
             alias,
             operator,
@@ -137,23 +123,10 @@ class Fragment {
             ontable,
             oncolumn
         } = this;
-        
-        // console.log(
-        //     '\nSTMT TYPE :', statementType, 
-        //     '\nCLAUSE    :', clause, 
-        //     '\nTYPE      :', type,
-        //     '\nDATABASE  :', database,
-        //     '\nTABLE     :', table,
-        //     '\nCOLUMN    :', column,
-        //     '\nSCHEMA    :', schema,
-        //     '\n'
-        // );
-        if (this.#sql || clause == 'pre') {
-            return this.#sql;
-        }
 
+        if (this.#sql || clause == 'pre') return this.#sql;
+        
         switch (clause) {
-            
             case 'select':
                 return `${schema}${alias ? ' AS ' + alias : ''}`;
             case 'update':
@@ -196,12 +169,12 @@ class Fragment {
                 
                 this.#sql = `${dir} ${db}${table} ON ${joinSchema} ${operator || '='} ${joinOnSchema}`;
                 break;
-            case 'group_by': 
+            case 'group_by':
                 this.#sql = `${schema}`;
                 break;
-            case 'order_by': 
-                dir = (direction || 'ASC');
-                this.#sql = `${schema} ${dir}`;
+            case 'order_by':
+                let asc = direction.toLowerCase().startsWith('a');
+                this.#sql = `${schema} ${asc ? 'ASC' : 'DESC'}`;
                 break;
             case 'limit' :
             case 'offset' :
@@ -213,16 +186,7 @@ class Fragment {
     }
     
     constructor(config = {}) {
-        config = Object.assign(
-            {
-
-            }, // config
-            {
-                type: 'sql'
-            },
-            config // passed in config
-        );
-        
+        config = Object.assign({}, { type: 'sql' }, config);
         var fields = Object.keys(config);
         fields.forEach(field => this[field] = config[field]);
     }

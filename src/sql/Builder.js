@@ -136,7 +136,7 @@ class Builder {
         if (fragment) {
             this.last.fragment = fragment;
         }
-        // console.log('CUSTOM STEPS:', this.#steps.custom);
+        
         return this.last;
     }
 
@@ -205,6 +205,7 @@ class Builder {
 
     where() {
         this.track({ clause: 'where' });
+        
         if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
         return this;
     }
@@ -229,18 +230,19 @@ class Builder {
         this.track({ clause: 'offset' });
         return this.add({ type: 'clause', column: 'OFFSET', values: offset });
     }
-    
     page(page, limit) {
         this.limit(limit);
         this.offset(limit * (page - 1));
         
         return this;
     }
+
     /**
      * RR - Repeatable Read
      * RS - Read Stability
      * CS - Cursor Stability
      * UR - Uncommitted Read
+     * NONE - Uncommitted Read
      */
     with(level) {
         this.track({ clause: 'with' });
@@ -612,9 +614,9 @@ class Builder {
             }
             if (length == argIdx++) {
                 let idx = 0;
-                options.table    = arguments[idx++];
-                options.column   = arguments[idx++];
-                options.operator = '=';
+                options.table       = arguments[idx++];
+                options.column      = arguments[idx++];
+                options.operator    = '=';
                 options.placeholder = arguments[idx++];
             }
             if (length == argIdx++) {
@@ -721,7 +723,7 @@ class Builder {
             let argIdx = 0;
             
             if (length == argIdx++) {
-                console.warn('SQL.Builder [WARNING]: No arguments');
+                console.warn('SQL.Builder [WARNING]: need a column and direction');
             }
             if (length == argIdx++) {
                 let idx = 0;
@@ -734,6 +736,13 @@ class Builder {
             }
             if (length == argIdx++) {
                 let idx = 0;
+                options.table       = arguments[idx++];
+                options.column      = arguments[idx++];
+                options.direction   = arguments[idx++];
+            }
+            if (length == argIdx++) {
+                let idx = 0;
+                options.database    = arguments[idx++];
                 options.table       = arguments[idx++];
                 options.column      = arguments[idx++];
                 options.direction   = arguments[idx++];
@@ -806,7 +815,7 @@ class Builder {
         clause = clause || this.#currentClause;
 
         var index = this.#index++;
-        var direction = this.direction;
+        var direction = direction || this.direction;
 
         options = {
             index,
@@ -884,7 +893,6 @@ class Builder {
              * Special handling of insert statements due to ...( A, B, C ) VALUES ( ?, ?, ? )
              */
             if (step === 'values') {
-                
                 const columns = [];
                 const placeholders = [];
 
@@ -939,8 +947,9 @@ class Builder {
                         statementClause.push(fragment.sql);
                     });
                 }
-
-                if (!statementClause.length) continue;
+                if (!statementClause.length) {
+                    continue;
+                }
             }
             
             statement.push(`${this.#clause[step]} ${statementClause.join(delimeter[step])}`);
@@ -1010,6 +1019,7 @@ class Builder {
             statement = statement.split(') VALUES (')   .join(EOL + ') VALUES (' + EOL + TAB);
             statement = statement.split(',')            .join(',' + EOL + TAB);
             statement = statement.split(' AND ')        .join(EOL + TAB + 'AND ');
+            statement = statement.split(' WITH ')       .join(EOL + TAB + 'WITH ');
         }
         return statement;
     }
