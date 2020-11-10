@@ -422,7 +422,7 @@ class Builder {
         }
         
         // UPDATE:
-        if (statementType.endsWith('update') || clause.endsWith('set')) {
+        if (statementType.endsWith('update') || clause.endsWith('update') || clause.endsWith('set')) {
             let argIdx = 0;
             
             if (length == argIdx++) {

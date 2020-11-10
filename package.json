@@ -1,15 +1,29 @@
 {
-  "name": "jsql",
+  "name": "@trozlabs/jsql",
   "version": "0.1.1",
   "description": "Node, MySQL and IBM SQL generator",
   "main": "src/index.js",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/trozlabs/jsql"
+  },
   "scripts": {
     "start": "nodemon test/index.js",
     "test": "node test/index.js"
   },
   "author": "Shayne Trosdahl<shayne@trozdol.com>",
   "license": "ISC",
-  "dependencies": {
-    "mysql": "^2.18.1"
+  "engines": {
+    "npm": ">=6.0.0",
+    "node" : ">=12.0.0"
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "@trozlabs/crud-o-matic": "@latest",
+    "mysql": "@latest",
+    "eradani-connect": "@latest"
+  },
+  "bundledDependencies": [],
+  "config": {
+    
   }
 }
