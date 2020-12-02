@@ -58,7 +58,7 @@ class Util {
     }
 
     static isNumber(obj) {
-        // return !Number.isNaN(Number.parseFloat(obj)) && !Number.isNaN(obj - 0);
+        return !Number.isNaN(Number.parseFloat(obj)) && !Number.isNaN(obj - 0);
     }
 
     static isInteger(obj) {
@@ -196,11 +196,11 @@ class Util {
     }
 
     static upper(obj) {
-        return obj.toUpperCase();
+        return String(obj).toUpperCase();
     }
 
     static lower(obj) {
-        return obj.toLowerCase();
+        return String(obj).toLowerCase();
     }
 
     static numberMask(mask, number) {
