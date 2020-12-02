@@ -974,7 +974,7 @@ class Builder {
                 
                 } else {
                     fragments.forEach((fragment, index, fragments) => {
-                    
+
                         if (this.paramsAllowed(fragment.clause)) {
     
                             if (fragment.values === undefined || !fragment.values.length) return;
@@ -992,18 +992,15 @@ class Builder {
                         statementClause.push(fragment.sql);
                     });
                 }
+
+                if ((type && type.startsWith('total')) && step === 'order_by') { 
+                    continue;
+                }
+                
                 if (!statementClause.length) {
                     continue;
                 }
             }
-
-            if (type && type.startsWith('total')) {
-                switch (step) {
-                    case 'group_by': continue;
-                    default: break;
-                }
-            }
-
             statement.push(`${this.#clause[step]} ${statementClause.join(delimeter[step])}`);
         }
 
