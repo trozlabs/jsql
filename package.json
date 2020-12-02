@@ -1,6 +1,6 @@
 {
   "name": "@trozlabs/jsql",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Node, MySQL and IBM SQL generator",
   "main": "src/index.js",
   "publishConfig": {
