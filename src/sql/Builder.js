@@ -1,6 +1,6 @@
 const { PLACEHOLDER, OPERATOR } = require('../constants');
 const Fragment = require('./Fragment');
-
+const Util = require('../Util');
 const EOL = '\n';
 const SPACE = ' ';
 const TAB = SPACE + SPACE + SPACE + SPACE; // fancy code
@@ -109,8 +109,6 @@ class Builder {
         this.config = Object.assign(this.config, config);
         this.#statementType = this.config.statementType || 'custom';
 
-        // console.log(this.config)
-
         if (this.config.pre) {
             // this.track({ statement: 'select', clause: 'pre' });
             this.add({
@@ -196,9 +194,12 @@ class Builder {
         if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
         return this;
     }
-    
+    /**
+     * @param {string} [direction] LEFT, RIGHT, undefined
+     * @returns {Builder} this
+     */    
     join(direction = '') {
-        this.direction = direction.toUpperCase();
+        this.direction = Util.upper(direction);
         this.track({ clause: 'join' });
         return this;
     }
@@ -207,29 +208,73 @@ class Builder {
         this.track({ clause: 'where' });
         
         if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
+
         return this;
     }
+
     group() {
         this.track({ clause: 'group_by' });
 
         if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
+        
         return this;
     }
+
+    /**
+     * @param {string} schema
+     * @param {string} direction 
+     */
     order() {
         this.track({ clause: 'order_by' });
 
-        if (this.type(arguments[0], 'string')) this.raw(arguments[0]);
+        if (arguments.length) {
+            var options = {};
+            if (arguments.length === 1) {
+                if (this.type(arguments[0], 'object')) {
+                    return this.add(arguments[0]);
+                } else {
+                    return this.add({ column: arguments[0] });
+                }
+            } else if (arguments.length === 2) {
+                options.column = arguments[0],
+                options.direction = arguments[1]
+            } else if (arguments.length === 3) {
+                options.table = arguments[0],
+                options.column = arguments[1],
+                options.direction = arguments[2]
+            } else if (arguments.length === 4) {
+                options.database = arguments[0],
+                options.table = arguments[1],
+                options.column = arguments[2],
+                options.direction = arguments[3]
+            }
+            this.add(options);
+        }
+
         return this;
     }
 
+    /**
+     * @param {number} limit
+     */
     limit(limit) {
         this.track({ clause: 'limit' });
+        
         return this.add({ column: 'limit', column: 'LIMIT', values: limit });
     }
+
+    /**
+     * @param {number} offset
+     */
     offset(offset) {
         this.track({ clause: 'offset' });
         return this.add({ type: 'clause', column: 'OFFSET', values: offset });
     }
+
+    /**
+     * @param {number} page
+     * @param {number} limit
+     */
     page(page, limit) {
         this.limit(limit);
         this.offset(limit * (page - 1));
@@ -246,6 +291,7 @@ class Builder {
      */
     with(level) {
         this.track({ clause: 'with' });
+        Util.check(level, ['RR', 'RS','CS','UR','NONE']);
         return this.add({ type: 'clause', sql: level });
     }
 
@@ -294,7 +340,6 @@ class Builder {
         var { clause } = this.track();
         var fragmentType = Builder.TABLE;
         var statementType = this.#statementType;
-        var argsIsOptions = length === 1 && this.type(arguments[0], 'object');
         var options = {
             statementType,
             clause,
@@ -876,6 +921,7 @@ class Builder {
     }
 
     build(type) {
+
         const delimeter     = this.#delimeter;
         const statementType = this.#statementType;
         const steps         = ['pre', ...this.#steps[type || statementType]];
@@ -883,9 +929,7 @@ class Builder {
         const parameters    = [];
         
         for (let step of steps) {
-            // console.log('step:', step)
             const fragments = this.#fragments.filter(fragment => fragment.clause.endsWith(step));
-            // console.log(statementType, step, fragments);
             const statementClause = [];
             var sql;
 
@@ -922,11 +966,12 @@ class Builder {
                 sql = `( ${columns.join(delimeter[step])} ) VALUES ( ${placeholders.join(delimeter[step])} )`;
                 
                 statementClause.push(sql);
-                
             } 
             else {
-                if (type === 'totals' && step === 'select') {
+                if ((type && type.startsWith('total')) && step === 'select') {
+                
                     statementClause.push('COUNT(*) AS TOTALS');
+                
                 } else {
                     fragments.forEach((fragment, index, fragments) => {
                     
@@ -951,7 +996,14 @@ class Builder {
                     continue;
                 }
             }
-            
+
+            if (type && type.startsWith('total')) {
+                switch (step) {
+                    case 'group_by': continue;
+                    default: break;
+                }
+            }
+
             statement.push(`${this.#clause[step]} ${statementClause.join(delimeter[step])}`);
         }
 
@@ -1019,7 +1071,7 @@ class Builder {
             statement = statement.split(') VALUES (')   .join(EOL + ') VALUES (' + EOL + TAB);
             statement = statement.split(',')            .join(',' + EOL + TAB);
             statement = statement.split(' AND ')        .join(EOL + TAB + 'AND ');
-            statement = statement.split(' WITH ')       .join(EOL + TAB + 'WITH ');
+            statement = statement.split(' WITH ')       .join(EOL + 'WITH ');
         }
         return statement;
     }
