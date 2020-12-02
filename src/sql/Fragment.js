@@ -173,7 +173,7 @@ class Fragment {
                 this.#sql = `${schema}`;
                 break;
             case 'order_by':
-                let asc = direction.toLowerCase().startsWith('a');
+                let asc = String(direction).toLowerCase().startsWith('a');
                 this.#sql = `${schema} ${asc ? 'ASC' : 'DESC'}`;
                 break;
             case 'limit' :
