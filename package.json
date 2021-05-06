@@ -1,17 +1,20 @@
 {
-  "name": "jsql",
-  "version": "0.1.5",
-  "description": "Node, MySQL and IBM SQL generator",
-  "main": "src/index.js",
-  "homepage": "https://github.com/trozlabs/jsql#readme",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 0"
-  },
-  "author": "Shayne Trosdahl<shayne@trozdol.com>",
-  "license": "ISC",
-  "engines": {
-    "npm": ">=6.0.0",
-    "node": ">=12.0.0"
-  },
-  "config": {}
+    "name": "jsql",
+    "version": "0.1.5",
+    "description": "Node, MySQL and IBM SQL generator",
+    "main": "src/index.js",
+    "homepage": "https://github.com/trozlabs/jsql#readme",
+    "repository": {
+        "url": "https://github.com/trozlabs/jsql.git"
+    },
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 0"
+    },
+    "author": "Shayne Trosdahl<shayne@trozdol.com>",
+    "license": "ISC",
+    "engines": {
+        "npm": ">=6.0.0",
+        "node": ">=12.0.0"
+    },
+    "config": {}
 }
