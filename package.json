@@ -1,12 +1,9 @@
 {
   "name": "jsql",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Node, MySQL and IBM SQL generator",
   "main": "src/index.js",
   "homepage": "https://github.com/trozlabs/jsql#readme",
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com/trozlabs/jsql"
-  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 0"
   },
