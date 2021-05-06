@@ -17,11 +17,7 @@
     "node" : ">=12.0.0"
   },
   "dependencies": {},
-  "peerDependencies": {
-    "@trozlabs/crud-o-matic": "@latest",
-    "mysql": "@latest",
-    "eradani-connect": "@latest"
-  },
+  "peerDependencies": {},
   "bundledDependencies": [],
   "config": {
     
