@@ -3,12 +3,12 @@
   "version": "0.1.4",
   "description": "Node, MySQL and IBM SQL generator",
   "main": "src/index.js",
+  "homepage": "https://github.com/trozlabs/jsql#readme",
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com/trozlabs/jsql"
+    "registry": "https://npm.pkg.github.com/"
   },
   "scripts": {
-    "start": "node test/index.js",
-    "test": "node test/index.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Shayne Trosdahl<shayne@trozdol.com>",
   "license": "ISC",
@@ -16,7 +16,5 @@
     "npm": ">=6.0.0",
     "node": ">=12.0.0"
   },
-  "peerDependencies": {},
-  "bundledDependencies": [],
   "config": {}
 }
