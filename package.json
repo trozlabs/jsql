@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "homepage": "https://github.com/trozlabs/jsql#readme",
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com/"
+    "registry": "https://npm.pkg.github.com/trozlabs/jsql"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 0"
