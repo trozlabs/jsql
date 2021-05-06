@@ -1,5 +1,5 @@
 {
-    "name": "jsql",
+    "name": "@trozlabs/jsql",
     "version": "0.1.5",
     "description": "Node, MySQL and IBM SQL generator",
     "main": "src/index.js",
